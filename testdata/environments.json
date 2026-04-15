@@ -1,0 +1,9 @@
+{
+  "total_count": 4,
+  "environments": [
+    {"name": "Development"},
+    {"name": "Test"},
+    {"name": "UAT"},
+    {"name": "Production"}
+  ]
+}
