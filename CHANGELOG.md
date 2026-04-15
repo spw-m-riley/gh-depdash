@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/spw-m-riley/gh-depdash/compare/gh-depdash-v1.1.0...gh-depdash-v1.1.1) (2026-04-15)
+
+
+### Bug Fixes
+
+* make extension release installable ([#2](https://github.com/spw-m-riley/gh-depdash/issues/2)) ([bb41420](https://github.com/spw-m-riley/gh-depdash/commit/bb414201e737b53aea21e6dc80e9afb94d25aca2))
+
 ## [1.1.0](https://github.com/spw-m-riley/gh-depdash/compare/gh-depdash-v1.0.0...gh-depdash-v1.1.0) (2026-04-15)
 
 
