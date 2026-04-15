@@ -17,7 +17,7 @@ Releases are automated with shared workflows from `matt-riley/matt-riley-ci`.
 - Push conventional commits to `main`.
 - Release Please opens or updates the release PR and manages `CHANGELOG.md`.
 - Merging the release PR creates the GitHub Release and version tag.
-- A publish workflow runs GoReleaser to attach `gh-depdash` binaries and `checksums.txt` to that release.
+- A publish workflow runs GoReleaser to attach `gh-depdash` release archives (`tar.gz`/`zip`) and `checksums.txt` to that release.
 
 ## Examples
 
