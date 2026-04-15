@@ -1,0 +1,16 @@
+name: Release
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: write
+
+jobs:
+  goreleaser:
+    uses: matt-riley/matt-riley-ci/.github/workflows/go-goreleaser.yml@v1
+    with:
+      go-version-file: go.mod
+      working-directory: .

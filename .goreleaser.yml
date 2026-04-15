@@ -1,0 +1,35 @@
+version: 2
+
+project_name: gh-depdash
+
+builds:
+  - id: gh-depdash
+    main: .
+    binary: gh-depdash
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - id: gh-depdash
+    ids:
+      - gh-depdash
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+
+checksum:
+  name_template: checksums.txt
+
+release:
+  mode: keep-existing
