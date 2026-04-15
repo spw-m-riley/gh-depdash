@@ -1,0 +1,9 @@
+{
+  "packages": {
+    ".": {
+      "package-name": "gh-depdash",
+      "release-type": "simple",
+      "changelog-path": "CHANGELOG.md"
+    }
+  }
+}
