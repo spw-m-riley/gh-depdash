@@ -7,5 +7,5 @@ import (
 )
 
 func RenderJSON(rows []deployments.Row) ([]byte, error) {
-	return json.Marshal(toViewRows(rows))
+	return json.Marshal(ToViewRows(rows))
 }

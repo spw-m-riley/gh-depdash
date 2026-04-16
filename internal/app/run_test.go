@@ -2,6 +2,7 @@ package app
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -478,6 +479,7 @@ type fixtureClient struct {
 	deploymentErrs  map[string]error
 	statuses        map[int64][]githubapi.DeploymentStatus
 	statusErrs      map[int64]error
+	repositories    []githubapi.Repository
 }
 
 func (c fixtureClient) ListEnvironments(owner, repo string) ([]githubapi.Environment, error) {
@@ -502,8 +504,12 @@ func (c fixtureClient) ListDeploymentStatuses(owner, repo string, deploymentID i
 }
 
 func (c fixtureClient) ListRepositories(page, perPage int) ([]githubapi.Repository, error) {
-	return nil, nil
+	if c.repositories == nil {
+		return nil, nil
+	}
+	return slices.Clone(c.repositories), nil
 }
+
 func mustParseURL(t *testing.T, raw string) *url.URL {
 	t.Helper()
 
@@ -513,3 +519,138 @@ func mustParseURL(t *testing.T, raw string) *url.URL {
 	}
 	return parsed
 }
+
+func TestLoadInitialRepositories(t *testing.T) {
+	desc1 := "First repo description"
+	desc2 := "Second repo description"
+	client := fixtureClient{
+		repositories: []githubapi.Repository{
+			{
+				FullName:    "octo/first",
+				Description: &desc1,
+			},
+			{
+				FullName:    "octo/second",
+				Description: &desc2,
+			},
+		},
+	}
+
+	items, err := LoadInitialRepositories(context.Background(), client)
+	if err != nil {
+		t.Fatalf("LoadInitialRepositories() error = %v", err)
+	}
+
+	if len(items) != 2 {
+		t.Fatalf("LoadInitialRepositories() returned %d items, want 2", len(items))
+	}
+
+	want := []RepositoryItem{
+		{FullName: "octo/first", Description: "First repo description"},
+		{FullName: "octo/second", Description: "Second repo description"},
+	}
+
+	for i, item := range items {
+		if item != want[i] {
+			t.Errorf("item[%d] = %+v, want %+v", i, item, want[i])
+		}
+	}
+}
+
+func TestLoadInitialRepositoriesHandlesNilDescription(t *testing.T) {
+	client := fixtureClient{
+		repositories: []githubapi.Repository{
+			{
+				FullName:    "octo/nodesc",
+				Description: nil,
+			},
+		},
+	}
+
+	items, err := LoadInitialRepositories(context.Background(), client)
+	if err != nil {
+		t.Fatalf("LoadInitialRepositories() error = %v", err)
+	}
+
+	if len(items) != 1 {
+		t.Fatalf("LoadInitialRepositories() returned %d items, want 1", len(items))
+	}
+
+	if items[0].Description != "" {
+		t.Errorf("items[0].Description = %q, want empty string", items[0].Description)
+	}
+}
+
+func TestLoadMoreRepositories(t *testing.T) {
+	desc := "Paged repo"
+	client := fixtureClient{
+		repositories: []githubapi.Repository{
+			{
+				FullName:    "octo/paged",
+				Description: &desc,
+			},
+		},
+	}
+
+	items, err := LoadMoreRepositories(context.Background(), client, 2, 50)
+	if err != nil {
+		t.Fatalf("LoadMoreRepositories() error = %v", err)
+	}
+
+	if len(items) != 1 {
+		t.Fatalf("LoadMoreRepositories() returned %d items, want 1", len(items))
+	}
+
+	want := RepositoryItem{FullName: "octo/paged", Description: "Paged repo"}
+	if items[0] != want {
+		t.Errorf("items[0] = %+v, want %+v", items[0], want)
+	}
+}
+
+func TestLoadDeploymentsForRepo(t *testing.T) {
+	client := fixtureClient{
+		environments: []githubapi.Environment{
+			{Name: "Production"},
+		},
+		deployments: map[string][]githubapi.Deployment{
+			"Production": {
+				{
+					ID:        201,
+					Ref:       "main",
+					CreatedAt: "2024-03-14T10:00:00Z",
+				},
+			},
+		},
+		statuses: map[int64][]githubapi.DeploymentStatus{
+			201: {
+				{
+					State:     "success",
+					CreatedAt: "2024-03-14T10:05:00Z",
+					LogURL:    "https://example.com/log",
+				},
+			},
+		},
+	}
+
+	items, err := LoadDeploymentsForRepo(context.Background(), client, "octo", "example", false, false)
+	if err != nil {
+		t.Fatalf("LoadDeploymentsForRepo() error = %v", err)
+	}
+
+	if len(items) != 1 {
+		t.Fatalf("LoadDeploymentsForRepo() returned %d items, want 1", len(items))
+	}
+
+	want := DeploymentItem{
+		Environment: "Production",
+		Branch:      "main",
+		Date:        "2024-03-14",
+		Status:      "success",
+		LogURL:      "https://example.com/log",
+	}
+
+	if items[0] != want {
+		t.Errorf("items[0] = %+v, want %+v", items[0], want)
+	}
+}
+
