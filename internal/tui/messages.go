@@ -1,6 +1,6 @@
 package tui
 
-import "gh-depdash/internal/deployments"
+import "gh-depdash/internal/output"
 
 type repoPageLoadedMsg struct {
 	repos []string
@@ -11,12 +11,8 @@ type repoPageFailedMsg struct {
 }
 
 type deploymentsLoadedMsg struct {
-	rows            []deployments.Row
+	rows            []output.ViewRow
 	partialFailures []string
-}
-
-type deploymentsPartialFailureMsg struct {
-	err string
 }
 
 type deploymentsFatalErrorMsg struct {

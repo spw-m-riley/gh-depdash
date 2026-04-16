@@ -32,6 +32,7 @@ var (
 		if err != nil {
 			return fmt.Errorf("gh authentication unavailable: %w", err)
 		}
+		tui.SetDeploymentLoader(LoadDeploymentsForRepo)
 		return tui.Run(ctx, client, false, false, stdout, stderr)
 	}
 )

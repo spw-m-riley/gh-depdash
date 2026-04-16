@@ -9,8 +9,8 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/lipgloss"
 
-	"gh-depdash/internal/deployments"
 	"gh-depdash/internal/githubapi"
+	"gh-depdash/internal/output"
 )
 
 type phase int
@@ -32,7 +32,7 @@ type Model struct {
 	fatalError      string
 	repoPage        []string
 	selectedRepo    string
-	deploymentRows  []deployments.Row
+	deploymentRows  []output.ViewRow
 	partialFailures []string
 	includePlans    bool
 	verbose         bool
@@ -92,11 +92,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.partialFailures = msg.partialFailures
 		m.phase = phaseDeploymentBrowser
 		return m, nil
-
-	case deploymentsPartialFailureMsg:
-		m.fatalError = msg.err
-		m.phase = phaseFatalError
-		return m, tea.Quit
 
 	case deploymentsFatalErrorMsg:
 		m.fatalError = msg.err

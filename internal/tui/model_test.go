@@ -7,8 +7,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"gh-depdash/internal/deployments"
 	"gh-depdash/internal/githubapi"
+	"gh-depdash/internal/output"
 )
 
 func TestModelInitPhaseRepoLoading(t *testing.T) {
@@ -91,7 +91,7 @@ func TestModelUpdateDeploymentsLoaded(t *testing.T) {
 	m.phase = phaseDeploymentLoading
 
 	msg := deploymentsLoadedMsg{
-		rows: []deployments.Row{
+		rows: []output.ViewRow{
 			{Environment: "Production"},
 		},
 		partialFailures: []string{"Dev: timeout"},

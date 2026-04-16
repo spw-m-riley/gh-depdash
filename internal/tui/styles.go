@@ -7,7 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/lipgloss"
 
-	"gh-depdash/internal/deployments"
+	"gh-depdash/internal/output"
 )
 
 var (
@@ -46,7 +46,7 @@ func renderDeploymentLoading(s spinner.Model, repo string) string {
 	return fmt.Sprintf("\n%s Loading deployments for %s...\n\n", s.View(), repo)
 }
 
-func renderDeploymentBrowser(rows []deployments.Row, partialFailures []string, verbose bool) string {
+func renderDeploymentBrowser(rows []output.ViewRow, partialFailures []string, verbose bool) string {
 	var b strings.Builder
 	b.WriteString("\n")
 	b.WriteString(titleStyle.Render("Deployment Status"))

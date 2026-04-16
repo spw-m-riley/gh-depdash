@@ -7,9 +7,17 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"gh-depdash/internal/deployments"
 	"gh-depdash/internal/githubapi"
+	"gh-depdash/internal/output"
 )
+
+var loadDeploymentsForRepo = func(ctx context.Context, client githubapi.Client, owner, repo string, includePlans, verbose bool) ([]output.ViewRow, []string, error) {
+	return nil, nil, fmt.Errorf("deployment loader not initialized")
+}
+
+func SetDeploymentLoader(fn func(context.Context, githubapi.Client, string, string, bool, bool) ([]output.ViewRow, []string, error)) {
+	loadDeploymentsForRepo = fn
+}
 
 func loadRepoPage(ctx context.Context, client githubapi.Client) tea.Cmd {
 	return func() tea.Msg {
@@ -24,96 +32,11 @@ func loadDeployments(ctx context.Context, client githubapi.Client, repo string, 
 			return deploymentsFatalErrorMsg{err: fmt.Sprintf("invalid repo target %q: expected <owner/repo>", repo)}
 		}
 
-		orderingService := deployments.Service{Client: orderingClient{base: client}}
-		orderedRows, err := orderingService.BuildRows(ctx, owner, repoName, includePlans)
+		items, partialFailures, err := loadDeploymentsForRepo(ctx, client, owner, repoName, includePlans, verbose)
 		if err != nil {
-			return deploymentsFatalErrorMsg{err: classifyBuildError(owner, repoName, err)}
-		}
-		if len(orderedRows) == 0 {
-			return deploymentsFatalErrorMsg{err: fmt.Sprintf("no environments found for %s/%s", owner, repoName)}
+			return deploymentsFatalErrorMsg{err: fmt.Sprintf("error loading deployments for %s/%s: %v", owner, repoName, err)}
 		}
 
-		rows := make([]deployments.Row, 0, len(orderedRows))
-		partialFailures := make([]string, 0)
-
-		for _, orderedRow := range orderedRows {
-			service := deployments.Service{Client: singleEnvironmentClient{
-				base:        client,
-				environment: orderedRow.Environment,
-			}}
-
-			builtRows, err := service.BuildRows(ctx, owner, repoName, true)
-			if err != nil {
-				partialFailures = append(partialFailures, fmt.Sprintf("%s: %v", orderedRow.Environment, err))
-				if verbose {
-					rows = append(rows, deployments.Row{Environment: orderedRow.Environment})
-				}
-				continue
-			}
-			if len(builtRows) == 0 {
-				if verbose {
-					rows = append(rows, deployments.Row{Environment: orderedRow.Environment})
-				}
-				continue
-			}
-
-			rows = append(rows, builtRows[0])
-		}
-
-		return deploymentsLoadedMsg{rows: rows, partialFailures: partialFailures}
+		return deploymentsLoadedMsg{rows: items, partialFailures: partialFailures}
 	}
-}
-
-func classifyBuildError(owner, repo string, err error) string {
-	return fmt.Sprintf("error loading deployments for %s/%s: %v", owner, repo, err)
-}
-
-type orderingClient struct {
-	base githubapi.Client
-}
-
-func (c orderingClient) ListEnvironments(owner, repo string) ([]githubapi.Environment, error) {
-	return c.base.ListEnvironments(owner, repo)
-}
-
-func (c orderingClient) ListDeployments(owner, repo, environment string) ([]githubapi.Deployment, error) {
-	return nil, nil
-}
-
-func (c orderingClient) ListDeploymentStatuses(owner, repo string, deploymentID int64) ([]githubapi.DeploymentStatus, error) {
-	return nil, nil
-}
-
-func (c orderingClient) ListRepositories(page, perPage int) ([]githubapi.Repository, error) {
-	return c.base.ListRepositories(page, perPage)
-}
-
-type singleEnvironmentClient struct {
-	base        githubapi.Client
-	environment string
-}
-
-func (c singleEnvironmentClient) ListEnvironments(owner, repo string) ([]githubapi.Environment, error) {
-	envs, err := c.base.ListEnvironments(owner, repo)
-	if err != nil {
-		return nil, err
-	}
-	for _, env := range envs {
-		if env.Name == c.environment {
-			return []githubapi.Environment{env}, nil
-		}
-	}
-	return nil, nil
-}
-
-func (c singleEnvironmentClient) ListDeployments(owner, repo, environment string) ([]githubapi.Deployment, error) {
-	return c.base.ListDeployments(owner, repo, environment)
-}
-
-func (c singleEnvironmentClient) ListDeploymentStatuses(owner, repo string, deploymentID int64) ([]githubapi.DeploymentStatus, error) {
-	return c.base.ListDeploymentStatuses(owner, repo, deploymentID)
-}
-
-func (c singleEnvironmentClient) ListRepositories(page, perPage int) ([]githubapi.Repository, error) {
-	return c.base.ListRepositories(page, perPage)
 }
