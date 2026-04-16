@@ -310,10 +310,12 @@ func TestRunInteractiveError(t *testing.T) {
 	restoreTTY := stubIsInteractiveTTY(t, true)
 	defer restoreTTY()
 
-	restoreInteractive := stubRunInteractive(t, func(includePlans, verbose bool, stdout, stderr io.Writer) error {
-		return errors.New("TUI startup failed")
+	restore := stubNewGitHubClient(t, func() (githubapi.Client, error) {
+		return fixtureClient{
+			repositoriesErr: errors.New("repo list failed"),
+		}, nil
 	})
-	defer restoreInteractive()
+	defer restore()
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -322,11 +324,12 @@ func TestRunInteractiveError(t *testing.T) {
 	if err == nil {
 		t.Fatal("Run() error = nil, want non-nil")
 	}
-	if !strings.Contains(err.Error(), "TUI startup failed") {
-		t.Fatalf("error = %v, want TUI startup failed", err)
+	want := "failed to list repositories: repo list failed"
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("error = %v, want %q", err, want)
 	}
-	if !strings.Contains(stderr.String(), "TUI startup failed") {
-		t.Fatalf("stderr = %q, want TUI startup failed written to stderr", stderr.String())
+	if got := strings.Count(stderr.String(), want); got != 1 {
+		t.Fatalf("stderr = %q, want exactly one %q occurrence, got %d", stderr.String(), want, got)
 	}
 }
 
@@ -604,6 +607,7 @@ type fixtureClient struct {
 	statuses        map[int64][]githubapi.DeploymentStatus
 	statusErrs      map[int64]error
 	repositories    []githubapi.Repository
+	repositoriesErr error
 }
 
 func (c fixtureClient) ListEnvironments(owner, repo string) ([]githubapi.Environment, error) {
@@ -628,6 +632,9 @@ func (c fixtureClient) ListDeploymentStatuses(owner, repo string, deploymentID i
 }
 
 func (c fixtureClient) ListRepositories(page, perPage int) ([]githubapi.Repository, error) {
+	if c.repositoriesErr != nil {
+		return nil, c.repositoriesErr
+	}
 	if c.repositories == nil {
 		return nil, nil
 	}

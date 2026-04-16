@@ -30,7 +30,7 @@ var (
 		ctx := context.Background()
 		client, err := newGitHubClient()
 		if err != nil {
-			return fmt.Errorf("gh authentication unavailable: %w", err)
+			return writeActionableError(stderr, authUnavailableMessage(err))
 		}
 		tui.SetDeploymentLoader(LoadDeploymentsForRepo)
 		return tui.Run(ctx, client, includePlans, verbose, stdout, stderr)
@@ -49,7 +49,7 @@ func Run(args []string, stdout, stderr io.Writer) error {
 		}
 		if isInteractiveTTY(os.Stdin, os.Stdout) {
 			if err := runInteractive(opts.IncludePlans, opts.Verbose, stdout, stderr); err != nil {
-				return writeActionableError(stderr, err.Error())
+				return err
 			}
 			return nil
 		}
