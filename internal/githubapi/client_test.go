@@ -146,12 +146,12 @@ func TestClientPropagatesHTTPErrors(t *testing.T) {
 func TestListRepositories(t *testing.T) {
 	client := newFixtureClient(t, fixtureResponse{
 		path:       "user/repos",
-		query:      url.Values{"sort": {"updated"}, "direction": {"desc"}, "page": {"1"}, "per_page": {"30"}},
+		query:      url.Values{"sort": {"updated"}, "direction": {"desc"}, "page": {"3"}, "per_page": {"17"}},
 		statusCode: http.StatusOK,
 		body:       loadTestdata(t, "repositories.json"),
 	})
 
-	got, err := client.ListRepositories(1, 30)
+	got, err := client.ListRepositories(3, 17)
 	if err != nil {
 		t.Fatalf("ListRepositories() error = %v, want nil", err)
 	}
@@ -213,13 +213,11 @@ func (rt fixtureRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 	}
 	gotQuery := req.URL.Query()
 	wantQuery := rt.response.query
-	
-	// Verify expected query parameters match
-	for key, wantVals := range wantQuery {
-		gotVals := gotQuery[key]
-		if !slices.Equal(gotVals, wantVals) {
-			rt.t.Fatalf("query param %q = %v, want %v", key, gotVals, wantVals)
-		}
+	if wantQuery == nil {
+		wantQuery = url.Values{}
+	}
+	if !reflect.DeepEqual(gotQuery, wantQuery) {
+		rt.t.Fatalf("unexpected query %q, want %q", gotQuery.Encode(), wantQuery.Encode())
 	}
 
 	return &http.Response{
