@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/url"
 	"slices"
 	"strings"
@@ -203,6 +204,9 @@ func TestRunJSON(t *testing.T) {
 }
 
 func TestRunMissingRepoError(t *testing.T) {
+	restoreTTY := stubIsInteractiveTTY(t, false)
+	defer restoreTTY()
+
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
@@ -215,6 +219,73 @@ func TestRunMissingRepoError(t *testing.T) {
 	}
 	if stdout.Len() != 0 {
 		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+}
+
+func TestRunMissingRepoWithJSONError(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := Run([]string{"--json"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("Run() error = nil, want non-nil")
+	}
+	if !strings.Contains(stderr.String(), "missing repo target") {
+		t.Fatalf("stderr = %q, want missing repo target guidance", stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+}
+
+func TestRunInteractiveLaunch(t *testing.T) {
+	restoreTTY := stubIsInteractiveTTY(t, true)
+	defer restoreTTY()
+
+	interactiveCalled := false
+	restoreInteractive := stubRunInteractive(t, func(stdout, stderr io.Writer) error {
+		interactiveCalled = true
+		_, _ = io.WriteString(stdout, "interactive mode\n")
+		return nil
+	})
+	defer restoreInteractive()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := Run(nil, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("Run() error = %v, want nil", err)
+	}
+	if !interactiveCalled {
+		t.Fatal("runInteractive was not called")
+	}
+	if !strings.Contains(stdout.String(), "interactive mode") {
+		t.Fatalf("stdout = %q, want interactive mode output", stdout.String())
+	}
+}
+
+func TestRunInteractiveError(t *testing.T) {
+	restoreTTY := stubIsInteractiveTTY(t, true)
+	defer restoreTTY()
+
+	restoreInteractive := stubRunInteractive(t, func(stdout, stderr io.Writer) error {
+		return errors.New("TUI startup failed")
+	})
+	defer restoreInteractive()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := Run(nil, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("Run() error = nil, want non-nil")
+	}
+	if !strings.Contains(err.Error(), "TUI startup failed") {
+		t.Fatalf("error = %v, want TUI startup failed", err)
+	}
+	if !strings.Contains(stderr.String(), "TUI startup failed") {
+		t.Fatalf("stderr = %q, want TUI startup failed written to stderr", stderr.String())
 	}
 }
 
@@ -373,6 +444,30 @@ func stubNewGitHubClient(t *testing.T, fn func() (githubapi.Client, error)) func
 
 	return func() {
 		newGitHubClient = previous
+	}
+}
+
+func stubIsInteractiveTTY(t *testing.T, interactive bool) func() {
+	t.Helper()
+
+	previous := isInteractiveTTY
+	isInteractiveTTY = func() bool {
+		return interactive
+	}
+
+	return func() {
+		isInteractiveTTY = previous
+	}
+}
+
+func stubRunInteractive(t *testing.T, fn func(stdout, stderr io.Writer) error) func() {
+	t.Helper()
+
+	previous := runInteractive
+	runInteractive = fn
+
+	return func() {
+		runInteractive = previous
 	}
 }
 

@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/cli/go-gh/v2/pkg/api"
+	"golang.org/x/term"
 
 	"gh-depdash/internal/cli"
 	"gh-depdash/internal/deployments"
@@ -20,12 +22,31 @@ var (
 	newGitHubClient = func() (githubapi.Client, error) {
 		return githubapi.NewRESTClient()
 	}
+	isInteractiveTTY = func() bool {
+		return term.IsTerminal(int(os.Stdout.Fd()))
+	}
+	runInteractive = func(stdout, stderr io.Writer) error {
+		return errors.New("interactive TUI not yet implemented")
+	}
 )
 
 func Run(args []string, stdout, stderr io.Writer) error {
 	opts, err := parseOptions(args)
 	if err != nil {
 		return err
+	}
+
+	if opts.Repo == "" {
+		if opts.JSON {
+			return writeActionableError(stderr, "missing repo target: pass <owner/repo> or use --repo <owner/repo>")
+		}
+		if isInteractiveTTY() {
+			if err := runInteractive(stdout, stderr); err != nil {
+				return writeActionableError(stderr, err.Error())
+			}
+			return nil
+		}
+		return writeActionableError(stderr, "missing repo target: pass <owner/repo> or use --repo <owner/repo>")
 	}
 
 	owner, repo, err := resolveRepoTarget(opts.Repo)
@@ -62,10 +83,6 @@ func Run(args []string, stdout, stderr io.Writer) error {
 }
 
 func resolveRepoTarget(target string) (string, string, error) {
-	if target == "" {
-		return "", "", errors.New("missing repo target: pass <owner/repo> or use --repo <owner/repo>")
-	}
-
 	owner, repo, ok := strings.Cut(target, "/")
 	if !ok || owner == "" || repo == "" || strings.Contains(repo, "/") {
 		return "", "", fmt.Errorf("invalid repo target %q: expected <owner/repo>", target)
