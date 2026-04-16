@@ -15,6 +15,7 @@ import (
 	"gh-depdash/internal/deployments"
 	"gh-depdash/internal/githubapi"
 	"gh-depdash/internal/output"
+	"gh-depdash/internal/tui"
 )
 
 var (
@@ -26,7 +27,12 @@ var (
 		return term.IsTerminal(int(os.Stdout.Fd()))
 	}
 	runInteractive = func(stdout, stderr io.Writer) error {
-		return errors.New("interactive TUI not yet implemented")
+		ctx := context.Background()
+		client, err := newGitHubClient()
+		if err != nil {
+			return fmt.Errorf("gh authentication unavailable: %w", err)
+		}
+		return tui.Run(ctx, client, false, false, stdout, stderr)
 	}
 )
 

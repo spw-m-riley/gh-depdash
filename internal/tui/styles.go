@@ -1,0 +1,78 @@
+package tui
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/lipgloss"
+
+	"gh-depdash/internal/deployments"
+)
+
+var (
+	titleStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("205"))
+
+	errorStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("196"))
+
+	subtleStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("241"))
+
+	successStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("42"))
+)
+
+func renderRepoLoading(s spinner.Model) string {
+	return fmt.Sprintf("\n%s Loading repositories...\n\n", s.View())
+}
+
+func renderRepoPicker(repos []string) string {
+	var b strings.Builder
+	b.WriteString("\n")
+	b.WriteString(titleStyle.Render("Select a repository:"))
+	b.WriteString("\n\n")
+	b.WriteString(subtleStyle.Render("(Repository picker not yet implemented)"))
+	b.WriteString("\n\n")
+	if len(repos) > 0 {
+		b.WriteString(fmt.Sprintf("Found %d repositories\n", len(repos)))
+	}
+	return b.String()
+}
+
+func renderDeploymentLoading(s spinner.Model, repo string) string {
+	return fmt.Sprintf("\n%s Loading deployments for %s...\n\n", s.View(), repo)
+}
+
+func renderDeploymentBrowser(rows []deployments.Row, partialFailures []string, verbose bool) string {
+	var b strings.Builder
+	b.WriteString("\n")
+	b.WriteString(titleStyle.Render("Deployment Status"))
+	b.WriteString("\n\n")
+	b.WriteString(subtleStyle.Render("(Deployment browser not yet implemented)"))
+	b.WriteString("\n\n")
+	if len(rows) > 0 {
+		b.WriteString(successStyle.Render(fmt.Sprintf("Loaded %d environment(s)", len(rows))))
+		b.WriteString("\n")
+	}
+	if len(partialFailures) > 0 {
+		b.WriteString(errorStyle.Render(fmt.Sprintf("%d partial failure(s)", len(partialFailures))))
+		b.WriteString("\n")
+	}
+	b.WriteString("\n")
+	b.WriteString(subtleStyle.Render("Press q or ctrl+c to quit"))
+	b.WriteString("\n")
+	return b.String()
+}
+
+func renderFatalError(err string) string {
+	var b strings.Builder
+	b.WriteString("\n")
+	b.WriteString(errorStyle.Render("Error:"))
+	b.WriteString(" ")
+	b.WriteString(err)
+	b.WriteString("\n\n")
+	return b.String()
+}
