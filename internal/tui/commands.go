@@ -12,8 +12,7 @@ import (
 )
 
 const (
-	perPage        = 30
-	maxReposToLoad = 100
+	perPage = 30
 )
 
 var loadDeploymentsForRepo = func(ctx context.Context, client githubapi.Client, owner, repo string, includePlans, verbose bool) ([]output.ViewRow, []string, error) {

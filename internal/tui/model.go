@@ -34,6 +34,7 @@ type Model struct {
 	repoList        list.Model
 	repoPage        int
 	repoHasMore     bool
+	repoLoadingMore bool
 	selectedRepo    string
 	deploymentRows  []output.ViewRow
 	partialFailures []string
@@ -102,10 +103,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						loadDeployments(m.ctx, m.client, m.selectedRepo, m.includePlans, m.verbose),
 					)
 				case loadMoreItem:
-					totalRepos := len(m.repoList.Items()) - 1
-					if totalRepos >= maxReposToLoad {
+					if !m.repoHasMore || m.repoLoadingMore {
 						return m, nil
 					}
+					m.repoLoadingMore = true
 					return m, loadMoreRepos(m.ctx, m.client, m.repoPage)
 				}
 			}
@@ -129,6 +130,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case repoPageLoadedMsg:
 		m.repoPage = 1
 		m.repoHasMore = msg.hasMore
+		m.repoLoadingMore = false
 		items := repoItemsFromRepositories(msg.repos, msg.hasMore)
 		m.repoList.SetItems(items)
 		m.phase = phaseRepoPicker
@@ -142,6 +144,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case moreReposLoadedMsg:
 		m.repoPage++
 		m.repoHasMore = msg.hasMore
+		m.repoLoadingMore = false
 		currentItems := m.repoList.Items()
 		var repoItems []list.Item
 		for _, item := range currentItems {
@@ -155,6 +158,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case moreReposFailedMsg:
+		m.repoLoadingMore = false
 		m.fatalError = msg.err
 		m.phase = phaseFatalError
 		return m, tea.Quit

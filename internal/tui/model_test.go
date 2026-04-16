@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"gh-depdash/internal/githubapi"
@@ -116,6 +117,61 @@ func TestModelLoadMoreRepos(t *testing.T) {
 	}
 	if cmd != nil {
 		t.Errorf("cmd after moreReposLoadedMsg = %v, want nil", cmd)
+	}
+}
+
+func TestModelLoadMoreReposAllowsAdditionalPages(t *testing.T) {
+	ctx := context.Background()
+	client := &stubClient{}
+	m := NewModel(ctx, client, false, false)
+	m.phase = phaseRepoPicker
+	m.repoPage = 4
+	m.repoHasMore = true
+
+	items := make([]list.Item, 0, 121)
+	for i := 0; i < 120; i++ {
+		repoName := fmt.Sprintf("owner/repo-%d", i)
+		items = append(items, repoItem{repo: githubapi.Repository{FullName: repoName}})
+	}
+	items = append(items, loadMoreItem{})
+	m.repoList.SetItems(items)
+	m.repoList.Select(len(items) - 1)
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+	um := updated.(Model)
+	if !um.repoLoadingMore {
+		t.Fatal("repoLoadingMore = false, want true after requesting another page")
+	}
+	if cmd == nil {
+		t.Fatal("cmd after load-more enter = nil, want non-nil")
+	}
+}
+
+func TestModelLoadMoreReposIgnoresDuplicateEnterWhileLoading(t *testing.T) {
+	ctx := context.Background()
+	client := &stubClient{}
+	m := NewModel(ctx, client, false, false)
+	m.phase = phaseRepoPicker
+	m.repoPage = 1
+	m.repoHasMore = true
+	m.repoLoadingMore = true
+
+	items := []list.Item{
+		repoItem{repo: githubapi.Repository{FullName: "owner/repo-1"}},
+		loadMoreItem{},
+	}
+	m.repoList.SetItems(items)
+	m.repoList.Select(len(items) - 1)
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+	um := updated.(Model)
+	if !um.repoLoadingMore {
+		t.Fatal("repoLoadingMore = false, want true while duplicate load-more is ignored")
+	}
+	if cmd != nil {
+		t.Fatalf("cmd after duplicate load-more enter = %v, want nil", cmd)
 	}
 }
 
