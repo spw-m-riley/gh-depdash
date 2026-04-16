@@ -604,93 +604,6 @@ func mustParseURL(t *testing.T, raw string) *url.URL {
 	return parsed
 }
 
-func TestLoadInitialRepositories(t *testing.T) {
-	desc1 := "First repo description"
-	desc2 := "Second repo description"
-	client := fixtureClient{
-		repositories: []githubapi.Repository{
-			{
-				FullName:    "octo/first",
-				Description: &desc1,
-			},
-			{
-				FullName:    "octo/second",
-				Description: &desc2,
-			},
-		},
-	}
-
-	items, err := LoadInitialRepositories(context.Background(), client)
-	if err != nil {
-		t.Fatalf("LoadInitialRepositories() error = %v", err)
-	}
-
-	if len(items) != 2 {
-		t.Fatalf("LoadInitialRepositories() returned %d items, want 2", len(items))
-	}
-
-	want := []RepositoryItem{
-		{FullName: "octo/first", Description: "First repo description"},
-		{FullName: "octo/second", Description: "Second repo description"},
-	}
-
-	for i, item := range items {
-		if item != want[i] {
-			t.Errorf("item[%d] = %+v, want %+v", i, item, want[i])
-		}
-	}
-}
-
-func TestLoadInitialRepositoriesHandlesNilDescription(t *testing.T) {
-	client := fixtureClient{
-		repositories: []githubapi.Repository{
-			{
-				FullName:    "octo/nodesc",
-				Description: nil,
-			},
-		},
-	}
-
-	items, err := LoadInitialRepositories(context.Background(), client)
-	if err != nil {
-		t.Fatalf("LoadInitialRepositories() error = %v", err)
-	}
-
-	if len(items) != 1 {
-		t.Fatalf("LoadInitialRepositories() returned %d items, want 1", len(items))
-	}
-
-	if items[0].Description != "" {
-		t.Errorf("items[0].Description = %q, want empty string", items[0].Description)
-	}
-}
-
-func TestLoadMoreRepositories(t *testing.T) {
-	desc := "Paged repo"
-	client := fixtureClient{
-		repositories: []githubapi.Repository{
-			{
-				FullName:    "octo/paged",
-				Description: &desc,
-			},
-		},
-	}
-
-	items, err := LoadMoreRepositories(context.Background(), client, 2, 50)
-	if err != nil {
-		t.Fatalf("LoadMoreRepositories() error = %v", err)
-	}
-
-	if len(items) != 1 {
-		t.Fatalf("LoadMoreRepositories() returned %d items, want 1", len(items))
-	}
-
-	want := RepositoryItem{FullName: "octo/paged", Description: "Paged repo"}
-	if items[0] != want {
-		t.Errorf("items[0] = %+v, want %+v", items[0], want)
-	}
-}
-
 func TestLoadDeploymentsForRepo(t *testing.T) {
 	client := fixtureClient{
 		environments: []githubapi.Environment{
@@ -729,7 +642,7 @@ func TestLoadDeploymentsForRepo(t *testing.T) {
 		t.Fatalf("LoadDeploymentsForRepo() returned %d items, want 1", len(items))
 	}
 
-	want := DeploymentItem{
+	want := output.ViewRow{
 		Environment: "Production",
 		Branch:      "main",
 		Date:        "2024-03-14",
@@ -806,7 +719,7 @@ func TestLoadDeploymentsForRepoPreservesPartialFailures(t *testing.T) {
 		t.Fatalf("LoadDeploymentsForRepo() returned %d items, want 3", len(items))
 	}
 
-	wantDev := DeploymentItem{
+	wantDev := output.ViewRow{
 		Environment: "Development",
 		Branch:      "feature/dev",
 		Date:        "2024-03-14",
@@ -817,14 +730,14 @@ func TestLoadDeploymentsForRepoPreservesPartialFailures(t *testing.T) {
 		t.Errorf("items[0] = %+v, want %+v", items[0], wantDev)
 	}
 
-	wantUAT := DeploymentItem{
+	wantUAT := output.ViewRow{
 		Environment: "UAT",
 	}
 	if items[1] != wantUAT {
 		t.Errorf("items[1] = %+v, want blank UAT row %+v", items[1], wantUAT)
 	}
 
-	wantProd := DeploymentItem{
+	wantProd := output.ViewRow{
 		Environment: "Production",
 		Branch:      "main",
 		Date:        "2024-03-14",
@@ -835,4 +748,3 @@ func TestLoadDeploymentsForRepoPreservesPartialFailures(t *testing.T) {
 		t.Errorf("items[2] = %+v, want %+v", items[2], wantProd)
 	}
 }
-
