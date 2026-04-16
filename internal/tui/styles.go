@@ -23,23 +23,12 @@ var (
 
 	successStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("42"))
+
+	docStyle = lipgloss.NewStyle().Margin(1, 2)
 )
 
 func renderRepoLoading(s spinner.Model) string {
 	return fmt.Sprintf("\n%s Loading repositories...\n\n", s.View())
-}
-
-func renderRepoPicker(repos []string) string {
-	var b strings.Builder
-	b.WriteString("\n")
-	b.WriteString(titleStyle.Render("Select a repository:"))
-	b.WriteString("\n\n")
-	b.WriteString(subtleStyle.Render("(Repository picker not yet implemented)"))
-	b.WriteString("\n\n")
-	if len(repos) > 0 {
-		b.WriteString(fmt.Sprintf("Found %d repositories\n", len(repos)))
-	}
-	return b.String()
 }
 
 func renderDeploymentLoading(s spinner.Model, repo string) string {

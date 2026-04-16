@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/lipgloss"
@@ -30,7 +31,9 @@ type Model struct {
 	repoSpinner     spinner.Model
 	deploySpinner   spinner.Model
 	fatalError      string
-	repoPage        []string
+	repoList        list.Model
+	repoPage        int
+	repoHasMore     bool
 	selectedRepo    string
 	deploymentRows  []output.ViewRow
 	partialFailures []string
@@ -47,12 +50,21 @@ func NewModel(ctx context.Context, client githubapi.Client, includePlans, verbos
 	deploySpinner.Spinner = spinner.Dot
 	deploySpinner.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
+	delegate := itemDelegate{}
+	repoList := list.New([]list.Item{}, delegate, 80, 20)
+	repoList.Title = "Select a repository"
+	repoList.SetShowStatusBar(false)
+	repoList.SetFilteringEnabled(true)
+	repoList.Styles.Title = titleStyle
+
 	return Model{
 		phase:         phaseRepoLoading,
 		ctx:           ctx,
 		client:        client,
 		repoSpinner:   repoSpinner,
 		deploySpinner: deploySpinner,
+		repoList:      repoList,
+		repoPage:      0,
 		includePlans:  includePlans,
 		verbose:       verbose,
 	}
@@ -72,17 +84,73 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "q":
-			return m, tea.Quit
+		if m.phase == phaseRepoPicker {
+			switch msg.String() {
+			case "ctrl+c", "q":
+				return m, tea.Quit
+			case "enter":
+				selected := m.repoList.SelectedItem()
+				if selected == nil {
+					return m, nil
+				}
+				switch item := selected.(type) {
+				case repoItem:
+					m.selectedRepo = item.repo.FullName
+					m.phase = phaseDeploymentLoading
+					return m, tea.Batch(
+						m.deploySpinner.Tick,
+						loadDeployments(m.ctx, m.client, m.selectedRepo, m.includePlans, m.verbose),
+					)
+				case loadMoreItem:
+					totalRepos := len(m.repoList.Items()) - 1
+					if totalRepos >= maxReposToLoad {
+						return m, nil
+					}
+					return m, loadMoreRepos(m.ctx, m.client, m.repoPage)
+				}
+			}
+		} else {
+			switch msg.String() {
+			case "ctrl+c", "q":
+				return m, tea.Quit
+			}
+		}
+
+	case tea.WindowSizeMsg:
+		if m.phase == phaseRepoPicker {
+			h, v := docStyle.GetFrameSize()
+			m.repoList.SetSize(msg.Width-h, msg.Height-v)
 		}
 
 	case repoPageLoadedMsg:
-		m.repoPage = msg.repos
+		m.repoPage = 1
+		m.repoHasMore = msg.hasMore
+		items := repoItemsFromRepositories(msg.repos, msg.hasMore)
+		m.repoList.SetItems(items)
 		m.phase = phaseRepoPicker
 		return m, nil
 
 	case repoPageFailedMsg:
+		m.fatalError = msg.err
+		m.phase = phaseFatalError
+		return m, tea.Quit
+
+	case moreReposLoadedMsg:
+		m.repoPage++
+		m.repoHasMore = msg.hasMore
+		currentItems := m.repoList.Items()
+		var repoItems []list.Item
+		for _, item := range currentItems {
+			if _, ok := item.(loadMoreItem); !ok {
+				repoItems = append(repoItems, item)
+			}
+		}
+		newItems := repoItemsFromRepositories(msg.repos, msg.hasMore)
+		repoItems = append(repoItems, newItems...)
+		m.repoList.SetItems(repoItems)
+		return m, nil
+
+	case moreReposFailedMsg:
 		m.fatalError = msg.err
 		m.phase = phaseFatalError
 		return m, tea.Quit
@@ -111,6 +179,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	if m.phase == phaseRepoPicker {
+		var cmd tea.Cmd
+		m.repoList, cmd = m.repoList.Update(msg)
+		return m, cmd
+	}
+
 	return m, nil
 }
 
@@ -119,7 +193,7 @@ func (m Model) View() string {
 	case phaseRepoLoading:
 		return renderRepoLoading(m.repoSpinner)
 	case phaseRepoPicker:
-		return renderRepoPicker(m.repoPage)
+		return docStyle.Render(m.repoList.View())
 	case phaseDeploymentLoading:
 		return renderDeploymentLoading(m.deploySpinner, m.selectedRepo)
 	case phaseDeploymentBrowser:

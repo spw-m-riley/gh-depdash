@@ -11,6 +11,11 @@ import (
 	"gh-depdash/internal/output"
 )
 
+const (
+	perPage        = 30
+	maxReposToLoad = 100
+)
+
 var loadDeploymentsForRepo = func(ctx context.Context, client githubapi.Client, owner, repo string, includePlans, verbose bool) ([]output.ViewRow, []string, error) {
 	return nil, nil, fmt.Errorf("deployment loader not initialized")
 }
@@ -21,7 +26,26 @@ func SetDeploymentLoader(fn func(context.Context, githubapi.Client, string, stri
 
 func loadRepoPage(ctx context.Context, client githubapi.Client) tea.Cmd {
 	return func() tea.Msg {
-		return repoPageFailedMsg{err: "repository discovery not yet implemented"}
+		repos, err := client.ListRepositories(1, perPage)
+		if err != nil {
+			return repoPageFailedMsg{err: fmt.Sprintf("failed to list repositories: %v", err)}
+		}
+
+		hasMore := len(repos) >= perPage
+		return repoPageLoadedMsg{repos: repos, hasMore: hasMore}
+	}
+}
+
+func loadMoreRepos(ctx context.Context, client githubapi.Client, currentPage int) tea.Cmd {
+	return func() tea.Msg {
+		nextPage := currentPage + 1
+		repos, err := client.ListRepositories(nextPage, perPage)
+		if err != nil {
+			return moreReposFailedMsg{err: fmt.Sprintf("failed to load more repositories: %v", err)}
+		}
+
+		hasMore := len(repos) >= perPage
+		return moreReposLoadedMsg{repos: repos, hasMore: hasMore}
 	}
 }
 
