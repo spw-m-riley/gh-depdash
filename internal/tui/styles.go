@@ -40,18 +40,30 @@ func renderDeploymentBrowser(rows []output.ViewRow, partialFailures []string, ve
 	b.WriteString("\n")
 	b.WriteString(titleStyle.Render("Deployment Status"))
 	b.WriteString("\n\n")
-	b.WriteString(subtleStyle.Render("(Deployment browser not yet implemented)"))
-	b.WriteString("\n\n")
-	if len(rows) > 0 {
-		b.WriteString(successStyle.Render(fmt.Sprintf("Loaded %d environment(s)", len(rows))))
+	
+	if len(rows) == 0 && len(partialFailures) == 0 {
+		b.WriteString(subtleStyle.Render("No deployments found"))
 		b.WriteString("\n")
+	} else {
+		for _, row := range rows {
+			item := newDeploymentItem(row)
+			b.WriteString(renderDeploymentItem(item, verbose))
+			b.WriteString("\n\n")
+		}
 	}
+	
 	if len(partialFailures) > 0 {
-		b.WriteString(errorStyle.Render(fmt.Sprintf("%d partial failure(s)", len(partialFailures))))
+		b.WriteString(errorStyle.Render("Partial failures:"))
+		b.WriteString("\n")
+		for _, failure := range partialFailures {
+			b.WriteString(errorStyle.Render("  • "))
+			b.WriteString(failure)
+			b.WriteString("\n")
+		}
 		b.WriteString("\n")
 	}
-	b.WriteString("\n")
-	b.WriteString(subtleStyle.Render("Press q or ctrl+c to quit"))
+	
+	b.WriteString(subtleStyle.Render("Press 'b' to go back, 'q' or ctrl+c to quit"))
 	b.WriteString("\n")
 	return b.String()
 }

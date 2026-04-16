@@ -31,3 +31,4 @@ type deploymentsLoadedMsg struct {
 type deploymentsFatalErrorMsg struct {
 	err string
 }
+type backToRepoPickerMsg struct{}

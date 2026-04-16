@@ -6,8 +6,8 @@ import (
 	"io"
 
 	"github.com/charmbracelet/bubbles/list"
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/spinner"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
 	"gh-depdash/internal/githubapi"
@@ -113,6 +113,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "ctrl+c", "q":
 				return m, tea.Quit
+			case "b":
+				if m.phase == phaseDeploymentBrowser {
+					return m, func() tea.Msg { return backToRepoPickerMsg{} }
+				}
 			}
 		}
 
@@ -165,6 +169,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.fatalError = msg.err
 		m.phase = phaseFatalError
 		return m, tea.Quit
+
+	case backToRepoPickerMsg:
+		m.phase = phaseRepoPicker
+		m.deploymentRows = nil
+		m.partialFailures = nil
+		m.selectedRepo = ""
+		return m, nil
 
 	case spinner.TickMsg:
 		switch m.phase {
