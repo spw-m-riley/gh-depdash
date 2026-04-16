@@ -244,8 +244,14 @@ func TestRunInteractiveLaunch(t *testing.T) {
 	defer restoreTTY()
 
 	interactiveCalled := false
-	restoreInteractive := stubRunInteractive(t, func(stdout, stderr io.Writer) error {
+	restoreInteractive := stubRunInteractive(t, func(includePlans, verbose bool, stdout, stderr io.Writer) error {
 		interactiveCalled = true
+		if includePlans {
+			t.Fatal("includePlans = true, want false")
+		}
+		if verbose {
+			t.Fatal("verbose = true, want false")
+		}
 		_, _ = io.WriteString(stdout, "interactive mode\n")
 		return nil
 	})
@@ -270,7 +276,7 @@ func TestRunInteractiveError(t *testing.T) {
 	restoreTTY := stubIsInteractiveTTY(t, true)
 	defer restoreTTY()
 
-	restoreInteractive := stubRunInteractive(t, func(stdout, stderr io.Writer) error {
+	restoreInteractive := stubRunInteractive(t, func(includePlans, verbose bool, stdout, stderr io.Writer) error {
 		return errors.New("TUI startup failed")
 	})
 	defer restoreInteractive()
@@ -287,6 +293,84 @@ func TestRunInteractiveError(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "TUI startup failed") {
 		t.Fatalf("stderr = %q, want TUI startup failed written to stderr", stderr.String())
+	}
+}
+
+func TestRunInteractiveLaunchForwardsFlags(t *testing.T) {
+	restoreTTY := stubIsInteractiveTTY(t, true)
+	defer restoreTTY()
+
+	restoreInteractive := stubRunInteractive(t, func(includePlans, verbose bool, stdout, stderr io.Writer) error {
+		if !includePlans {
+			t.Fatal("includePlans = false, want true")
+		}
+		if !verbose {
+			t.Fatal("verbose = false, want true")
+		}
+		return nil
+	})
+	defer restoreInteractive()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := Run([]string{"--plans", "--verbose"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("Run() error = %v, want nil", err)
+	}
+}
+
+func TestRunExplicitRepoBypassesInteractiveOnTTY(t *testing.T) {
+	restoreTTY := stubIsInteractiveTTY(t, true)
+	defer restoreTTY()
+
+	restore := stubNewGitHubClient(t, func() (githubapi.Client, error) {
+		return fixtureClient{
+			environments: []githubapi.Environment{
+				{Name: "Production"},
+			},
+			deployments: map[string][]githubapi.Deployment{
+				"Production": {
+					{
+						ID:        301,
+						Ref:       "main",
+						CreatedAt: "2024-03-14T09:26:00Z",
+					},
+				},
+			},
+			statuses: map[int64][]githubapi.DeploymentStatus{
+				301: {
+					{
+						State:     "success",
+						CreatedAt: "2024-03-14T09:30:00Z",
+						LogURL:    "https://example.com/prod",
+					},
+				},
+			},
+		}, nil
+	})
+	defer restore()
+
+	restoreInteractive := stubRunInteractive(t, func(includePlans, verbose bool, stdout, stderr io.Writer) error {
+		t.Fatal("runInteractive should not be called for explicit repo targets")
+		return nil
+	})
+	defer restoreInteractive()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := Run([]string{"octo/example"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("Run() error = %v, want nil", err)
+	}
+
+	want := "Env | Branch | Date\nProduction | main | 2024-03-14\n"
+	if stdout.String() != want {
+		t.Fatalf("stdout = %q, want %q", stdout.String(), want)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
 }
 
@@ -461,7 +545,7 @@ func stubIsInteractiveTTY(t *testing.T, interactive bool) func() {
 	}
 }
 
-func stubRunInteractive(t *testing.T, fn func(stdout, stderr io.Writer) error) func() {
+func stubRunInteractive(t *testing.T, fn func(includePlans, verbose bool, stdout, stderr io.Writer) error) func() {
 	t.Helper()
 
 	previous := runInteractive
@@ -751,5 +835,4 @@ func TestLoadDeploymentsForRepoPreservesPartialFailures(t *testing.T) {
 		t.Errorf("items[2] = %+v, want %+v", items[2], wantProd)
 	}
 }
-
 

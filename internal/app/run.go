@@ -26,14 +26,14 @@ var (
 	isInteractiveTTY = func() bool {
 		return term.IsTerminal(int(os.Stdout.Fd()))
 	}
-	runInteractive = func(stdout, stderr io.Writer) error {
+	runInteractive = func(includePlans, verbose bool, stdout, stderr io.Writer) error {
 		ctx := context.Background()
 		client, err := newGitHubClient()
 		if err != nil {
 			return fmt.Errorf("gh authentication unavailable: %w", err)
 		}
 		tui.SetDeploymentLoader(LoadDeploymentsForRepo)
-		return tui.Run(ctx, client, false, false, stdout, stderr)
+		return tui.Run(ctx, client, includePlans, verbose, stdout, stderr)
 	}
 )
 
@@ -48,7 +48,7 @@ func Run(args []string, stdout, stderr io.Writer) error {
 			return writeActionableError(stderr, "missing repo target: pass <owner/repo> or use --repo <owner/repo>")
 		}
 		if isInteractiveTTY() {
-			if err := runInteractive(stdout, stderr); err != nil {
+			if err := runInteractive(opts.IncludePlans, opts.Verbose, stdout, stderr); err != nil {
 				return writeActionableError(stderr, err.Error())
 			}
 			return nil
@@ -242,4 +242,3 @@ func (c singleEnvironmentClient) ListRepositories(page, perPage int) ([]githubap
 }
 
 var errNoEnvironments = errors.New("no environments found")
-
