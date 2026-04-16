@@ -131,6 +131,10 @@ func (c fixtureClient) ListDeploymentStatuses(owner, repo string, deploymentID i
 	return slices.Clone(c.statuses[deploymentID]), nil
 }
 
+func (c fixtureClient) ListRepositories(page, perPage int) ([]githubapi.Repository, error) {
+	return nil, nil
+}
+
 func newFixtureService(t *testing.T) Service {
 	t.Helper()
 

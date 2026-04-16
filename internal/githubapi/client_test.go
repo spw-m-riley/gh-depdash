@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -142,6 +143,53 @@ func TestClientPropagatesHTTPErrors(t *testing.T) {
 	}
 }
 
+func TestListRepositories(t *testing.T) {
+	client := newFixtureClient(t, fixtureResponse{
+		path:       "user/repos",
+		query:      url.Values{"sort": {"updated"}, "direction": {"desc"}, "page": {"1"}, "per_page": {"30"}},
+		statusCode: http.StatusOK,
+		body:       loadTestdata(t, "repositories.json"),
+	})
+
+	got, err := client.ListRepositories(1, 30)
+	if err != nil {
+		t.Fatalf("ListRepositories() error = %v, want nil", err)
+	}
+
+	want := []Repository{
+		{
+			Name:        "example",
+			FullName:    "octo/example",
+			Description: stringPtr("Primary deployment target"),
+			Private:     true,
+			Visibility:  "private",
+			Permissions: RepositoryPermissions{Push: true},
+			UpdatedAt:   "2026-04-14T10:30:00Z",
+		},
+		{
+			Name:        "demo",
+			FullName:    "octo/demo",
+			Description: stringPtr("Shared sandbox"),
+			Private:     false,
+			Visibility:  "public",
+			Permissions: RepositoryPermissions{Push: true},
+			UpdatedAt:   "2026-04-13T15:20:00Z",
+		},
+		{
+			Name:        "readonly",
+			FullName:    "octo/readonly",
+			Description: nil,
+			Private:     true,
+			Visibility:  "private",
+			Permissions: RepositoryPermissions{Push: false},
+			UpdatedAt:   "2026-04-12T08:00:00Z",
+		},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ListRepositories() = %#v, want %#v", got, want)
+	}
+}
+
 type fixtureResponse struct {
 	path       string
 	query      url.Values
@@ -164,8 +212,14 @@ func (rt fixtureRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 		rt.t.Fatalf("unexpected path %q, want %q", got, "/"+rt.response.path)
 	}
 	gotQuery := req.URL.Query()
-	if !slices.Equal(gotQuery["per_page"], rt.response.query["per_page"]) || gotQuery.Get("environment") != rt.response.query.Get("environment") {
-		rt.t.Fatalf("unexpected query %q, want %q", gotQuery.Encode(), rt.response.query.Encode())
+	wantQuery := rt.response.query
+	
+	// Verify expected query parameters match
+	for key, wantVals := range wantQuery {
+		gotVals := gotQuery[key]
+		if !slices.Equal(gotVals, wantVals) {
+			rt.t.Fatalf("query param %q = %v, want %v", key, gotVals, wantVals)
+		}
 	}
 
 	return &http.Response{
@@ -202,4 +256,8 @@ func loadTestdata(t *testing.T, name string) []byte {
 		t.Fatalf("ReadFile(%q) error = %v", path, err)
 	}
 	return data
+}
+
+func stringPtr(value string) *string {
+	return &value
 }

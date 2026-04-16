@@ -197,18 +197,21 @@ type orderingClient struct {
 	base githubapi.Client
 }
 
-func (c orderingClient) ListEnvironments(owner, repo string) ([]githubapi.Environment, error) {
-	return c.base.ListEnvironments(owner, repo)
+func (c singleEnvironmentClient) ListEnvironments(owner, repo string) ([]githubapi.Environment, error) {
+	return []githubapi.Environment{{Name: c.environment}}, nil
 }
 
-func (orderingClient) ListDeployments(owner, repo, environment string) ([]githubapi.Deployment, error) {
-	return nil, nil
+func (c singleEnvironmentClient) ListDeployments(owner, repo, environment string) ([]githubapi.Deployment, error) {
+	return c.base.ListDeployments(owner, repo, c.environment)
 }
 
-func (orderingClient) ListDeploymentStatuses(owner, repo string, deploymentID int64) ([]githubapi.DeploymentStatus, error) {
-	return nil, nil
+func (c singleEnvironmentClient) ListDeploymentStatuses(owner, repo string, deploymentID int64) ([]githubapi.DeploymentStatus, error) {
+	return c.base.ListDeploymentStatuses(owner, repo, deploymentID)
 }
 
+func (c singleEnvironmentClient) ListRepositories(page, perPage int) ([]githubapi.Repository, error) {
+	return c.base.ListRepositories(page, perPage)
+}
 type singleEnvironmentClient struct {
 	base        githubapi.Client
 	environment string
@@ -225,5 +228,4 @@ func (c singleEnvironmentClient) ListDeployments(owner, repo, environment string
 func (c singleEnvironmentClient) ListDeploymentStatuses(owner, repo string, deploymentID int64) ([]githubapi.DeploymentStatus, error) {
 	return c.base.ListDeploymentStatuses(owner, repo, deploymentID)
 }
-
 var errNoEnvironments = errors.New("no environments found")

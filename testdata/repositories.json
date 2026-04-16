@@ -1,0 +1,35 @@
+[
+  {
+    "name": "example",
+    "full_name": "octo/example",
+    "description": "Primary deployment target",
+    "private": true,
+    "visibility": "private",
+    "permissions": {
+      "push": true
+    },
+    "updated_at": "2026-04-14T10:30:00Z"
+  },
+  {
+    "name": "demo",
+    "full_name": "octo/demo",
+    "description": "Shared sandbox",
+    "private": false,
+    "visibility": "public",
+    "permissions": {
+      "push": true
+    },
+    "updated_at": "2026-04-13T15:20:00Z"
+  },
+  {
+    "name": "readonly",
+    "full_name": "octo/readonly",
+    "description": null,
+    "private": true,
+    "visibility": "private",
+    "permissions": {
+      "push": false
+    },
+    "updated_at": "2026-04-12T08:00:00Z"
+  }
+]
