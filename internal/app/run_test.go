@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"net/url"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -269,6 +270,39 @@ func TestRunInteractiveLaunch(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "interactive mode") {
 		t.Fatalf("stdout = %q, want interactive mode output", stdout.String())
+	}
+}
+
+func TestRunMissingRepoWhenTTYCheckFails(t *testing.T) {
+	restoreTTY := stubIsInteractiveTTYFn(t, func(stdin, stdout *os.File) bool {
+		if stdin != os.Stdin {
+			t.Fatalf("stdin = %v, want os.Stdin", stdin)
+		}
+		if stdout != os.Stdout {
+			t.Fatalf("stdout = %v, want os.Stdout", stdout)
+		}
+		return false
+	})
+	defer restoreTTY()
+
+	restoreInteractive := stubRunInteractive(t, func(includePlans, verbose bool, stdout, stderr io.Writer) error {
+		t.Fatal("runInteractive should not be called when the session is not fully interactive")
+		return nil
+	})
+	defer restoreInteractive()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := Run(nil, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("Run() error = nil, want non-nil")
+	}
+	if !strings.Contains(stderr.String(), "missing repo target") {
+		t.Fatalf("stderr = %q, want missing repo target guidance", stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
 	}
 }
 
@@ -535,10 +569,16 @@ func stubNewGitHubClient(t *testing.T, fn func() (githubapi.Client, error)) func
 func stubIsInteractiveTTY(t *testing.T, interactive bool) func() {
 	t.Helper()
 
-	previous := isInteractiveTTY
-	isInteractiveTTY = func() bool {
+	return stubIsInteractiveTTYFn(t, func(stdin, stdout *os.File) bool {
 		return interactive
-	}
+	})
+}
+
+func stubIsInteractiveTTYFn(t *testing.T, fn func(stdin, stdout *os.File) bool) func() {
+	t.Helper()
+
+	previous := isInteractiveTTY
+	isInteractiveTTY = fn
 
 	return func() {
 		isInteractiveTTY = previous

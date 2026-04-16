@@ -175,6 +175,75 @@ func TestModelLoadMoreReposIgnoresDuplicateEnterWhileLoading(t *testing.T) {
 	}
 }
 
+func TestModelIgnoresLateMoreReposLoadedAfterSelection(t *testing.T) {
+	ctx := context.Background()
+	client := &stubClient{}
+	m := NewModel(ctx, client, false, false)
+	m.phase = phaseDeploymentLoading
+	m.selectedRepo = "owner/repo-1"
+	m.repoPage = 1
+	m.repoHasMore = true
+	m.repoLoadingMore = true
+
+	items := []list.Item{
+		repoItem{repo: githubapi.Repository{FullName: "owner/repo-1"}},
+		loadMoreItem{},
+	}
+	m.repoList.SetItems(items)
+
+	updated, cmd := m.Update(moreReposLoadedMsg{
+		repos: []githubapi.Repository{
+			{FullName: "owner/repo-2"},
+		},
+		hasMore: true,
+	})
+
+	um := updated.(Model)
+	if um.phase != phaseDeploymentLoading {
+		t.Fatalf("phase after late moreReposLoadedMsg = %v, want %v", um.phase, phaseDeploymentLoading)
+	}
+	if um.selectedRepo != "owner/repo-1" {
+		t.Fatalf("selectedRepo = %q, want %q", um.selectedRepo, "owner/repo-1")
+	}
+	if um.repoPage != 1 {
+		t.Fatalf("repoPage = %d, want 1", um.repoPage)
+	}
+	if um.repoLoadingMore {
+		t.Fatal("repoLoadingMore = true, want false after late pagination result is ignored")
+	}
+	if cmd != nil {
+		t.Fatalf("cmd after late moreReposLoadedMsg = %v, want nil", cmd)
+	}
+}
+
+func TestModelIgnoresLateMoreReposFailedAfterSelection(t *testing.T) {
+	ctx := context.Background()
+	client := &stubClient{}
+	m := NewModel(ctx, client, false, false)
+	m.phase = phaseDeploymentLoading
+	m.selectedRepo = "owner/repo-1"
+	m.repoLoadingMore = true
+
+	updated, cmd := m.Update(moreReposFailedMsg{err: "network timeout"})
+
+	um := updated.(Model)
+	if um.phase != phaseDeploymentLoading {
+		t.Fatalf("phase after late moreReposFailedMsg = %v, want %v", um.phase, phaseDeploymentLoading)
+	}
+	if um.selectedRepo != "owner/repo-1" {
+		t.Fatalf("selectedRepo = %q, want %q", um.selectedRepo, "owner/repo-1")
+	}
+	if um.repoLoadingMore {
+		t.Fatal("repoLoadingMore = true, want false after late pagination failure is ignored")
+	}
+	if um.fatalError != "" {
+		t.Fatalf("fatalError = %q, want empty", um.fatalError)
+	}
+	if cmd != nil {
+		t.Fatalf("cmd after late moreReposFailedMsg = %v, want nil", cmd)
+	}
+}
+
 func TestModelRepoSelection(t *testing.T) {
 	ctx := context.Background()
 	client := &stubClient{}

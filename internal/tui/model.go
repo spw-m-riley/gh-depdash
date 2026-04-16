@@ -142,6 +142,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 
 	case moreReposLoadedMsg:
+		if m.phase != phaseRepoPicker {
+			m.repoLoadingMore = false
+			return m, nil
+		}
 		m.repoPage++
 		m.repoHasMore = msg.hasMore
 		m.repoLoadingMore = false
@@ -158,6 +162,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case moreReposFailedMsg:
+		if m.phase != phaseRepoPicker {
+			m.repoLoadingMore = false
+			return m, nil
+		}
 		m.repoLoadingMore = false
 		m.fatalError = msg.err
 		m.phase = phaseFatalError

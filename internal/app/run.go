@@ -23,8 +23,8 @@ var (
 	newGitHubClient = func() (githubapi.Client, error) {
 		return githubapi.NewRESTClient()
 	}
-	isInteractiveTTY = func() bool {
-		return term.IsTerminal(int(os.Stdout.Fd()))
+	isInteractiveTTY = func(stdin, stdout *os.File) bool {
+		return term.IsTerminal(int(stdin.Fd())) && term.IsTerminal(int(stdout.Fd()))
 	}
 	runInteractive = func(includePlans, verbose bool, stdout, stderr io.Writer) error {
 		ctx := context.Background()
@@ -47,7 +47,7 @@ func Run(args []string, stdout, stderr io.Writer) error {
 		if opts.JSON {
 			return writeActionableError(stderr, "missing repo target: pass <owner/repo> or use --repo <owner/repo>")
 		}
-		if isInteractiveTTY() {
+		if isInteractiveTTY(os.Stdin, os.Stdout) {
 			if err := runInteractive(opts.IncludePlans, opts.Verbose, stdout, stderr); err != nil {
 				return writeActionableError(stderr, err.Error())
 			}
