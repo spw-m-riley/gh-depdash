@@ -632,9 +632,13 @@ func TestLoadDeploymentsForRepo(t *testing.T) {
 		},
 	}
 
-	items, err := LoadDeploymentsForRepo(context.Background(), client, "octo", "example", false, false)
+	items, partialFailures, err := LoadDeploymentsForRepo(context.Background(), client, "octo", "example", false, false)
 	if err != nil {
 		t.Fatalf("LoadDeploymentsForRepo() error = %v", err)
+	}
+
+	if len(partialFailures) != 0 {
+		t.Errorf("LoadDeploymentsForRepo() returned %d partial failures, want 0", len(partialFailures))
 	}
 
 	if len(items) != 1 {
@@ -653,4 +657,99 @@ func TestLoadDeploymentsForRepo(t *testing.T) {
 		t.Errorf("items[0] = %+v, want %+v", items[0], want)
 	}
 }
+
+func TestLoadDeploymentsForRepoPreservesPartialFailures(t *testing.T) {
+	client := fixtureClient{
+		environments: []githubapi.Environment{
+			{Name: "Development"},
+			{Name: "UAT"},
+			{Name: "Production"},
+		},
+		deployments: map[string][]githubapi.Deployment{
+			"Development": {
+				{
+					ID:        101,
+					Ref:       "feature/dev",
+					CreatedAt: "2024-03-14T09:00:00Z",
+				},
+			},
+			"Production": {
+				{
+					ID:        301,
+					Ref:       "main",
+					CreatedAt: "2024-03-14T12:00:00Z",
+				},
+			},
+		},
+		deploymentErrs: map[string]error{
+			"UAT": errors.New("environment temporarily unavailable"),
+		},
+		statuses: map[int64][]githubapi.DeploymentStatus{
+			101: {
+				{
+					State:     "success",
+					CreatedAt: "2024-03-14T09:05:00Z",
+					LogURL:    "https://example.com/dev-log",
+				},
+			},
+			301: {
+				{
+					State:     "success",
+					CreatedAt: "2024-03-14T12:05:00Z",
+					LogURL:    "https://example.com/prod-log",
+				},
+			},
+		},
+	}
+
+	items, partialFailures, err := LoadDeploymentsForRepo(context.Background(), client, "octo", "example", false, true)
+	if err != nil {
+		t.Fatalf("LoadDeploymentsForRepo() error = %v, want nil", err)
+	}
+
+	if len(partialFailures) != 1 {
+		t.Fatalf("LoadDeploymentsForRepo() returned %d partial failures, want 1", len(partialFailures))
+	}
+
+	if !strings.Contains(partialFailures[0], "UAT") {
+		t.Errorf("partial failure %q does not mention UAT", partialFailures[0])
+	}
+	if !strings.Contains(partialFailures[0], "temporarily unavailable") {
+		t.Errorf("partial failure %q does not contain error message", partialFailures[0])
+	}
+
+	if len(items) != 3 {
+		t.Fatalf("LoadDeploymentsForRepo() returned %d items, want 3", len(items))
+	}
+
+	wantDev := DeploymentItem{
+		Environment: "Development",
+		Branch:      "feature/dev",
+		Date:        "2024-03-14",
+		Status:      "success",
+		LogURL:      "https://example.com/dev-log",
+	}
+	if items[0] != wantDev {
+		t.Errorf("items[0] = %+v, want %+v", items[0], wantDev)
+	}
+
+	wantUAT := DeploymentItem{
+		Environment: "UAT",
+	}
+	if items[1] != wantUAT {
+		t.Errorf("items[1] = %+v, want blank UAT row %+v", items[1], wantUAT)
+	}
+
+	wantProd := DeploymentItem{
+		Environment: "Production",
+		Branch:      "main",
+		Date:        "2024-03-14",
+		Status:      "success",
+		LogURL:      "https://example.com/prod-log",
+	}
+	if items[2] != wantProd {
+		t.Errorf("items[2] = %+v, want %+v", items[2], wantProd)
+	}
+}
+
 
