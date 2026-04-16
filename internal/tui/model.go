@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"io"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -161,7 +162,7 @@ func Run(ctx context.Context, client githubapi.Client, includePlans, verbose boo
 		if stderr != nil {
 			_, _ = io.WriteString(stderr, fm.fatalError+"\n")
 		}
-		return nil
+		return fmt.Errorf("%s", fm.fatalError)
 	}
 
 	return nil

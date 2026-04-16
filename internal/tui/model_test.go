@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -201,4 +202,60 @@ func TestNewProgramSeam(t *testing.T) {
 	if !called {
 		t.Error("newProgram seam was not invoked")
 	}
+}
+
+func TestRunHandlesFatalErrorPhase(t *testing.T) {
+	ctx := context.Background()
+	client := &errorClient{err: "repository discovery not yet implemented"}
+
+	var stdout, stderr stubWriter
+
+	err := Run(ctx, client, false, false, &stdout, &stderr)
+
+	if err == nil {
+		t.Fatal("Run() with fatal error phase returned nil, want error")
+	}
+	if err.Error() != "repository discovery not yet implemented" {
+		t.Errorf("Run() error = %q, want %q", err.Error(), "repository discovery not yet implemented")
+	}
+	if stderr.String() != "repository discovery not yet implemented\n" {
+		t.Errorf("stderr = %q, want message written", stderr.String())
+	}
+}
+
+type stubWriter struct {
+	buf []byte
+}
+
+func (w *stubWriter) Write(p []byte) (n int, err error) {
+	w.buf = append(w.buf, p...)
+	return len(p), nil
+}
+
+func (w *stubWriter) String() string {
+	return string(w.buf)
+}
+
+func (w *stubWriter) Len() int {
+	return len(w.buf)
+}
+
+type errorClient struct {
+	err string
+}
+
+func (c *errorClient) ListEnvironments(owner, repo string) ([]githubapi.Environment, error) {
+	return nil, fmt.Errorf("%s", c.err)
+}
+
+func (c *errorClient) ListDeployments(owner, repo, environment string) ([]githubapi.Deployment, error) {
+	return nil, fmt.Errorf("%s", c.err)
+}
+
+func (c *errorClient) ListDeploymentStatuses(owner, repo string, deploymentID int64) ([]githubapi.DeploymentStatus, error) {
+	return nil, fmt.Errorf("%s", c.err)
+}
+
+func (c *errorClient) ListRepositories(page, perPage int) ([]githubapi.Repository, error) {
+	return nil, fmt.Errorf("%s", c.err)
 }
