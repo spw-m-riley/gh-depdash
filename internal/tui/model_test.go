@@ -215,7 +215,6 @@ func TestModelIgnoresLateMoreReposLoadedAfterSelection(t *testing.T) {
 	m.repoPickerSession = 1
 	m.repoPage = 1
 	m.repoHasMore = true
-	m.repoLoadingMore = true
 
 	items := []list.Item{
 		repoItem{repo: githubapi.Repository{FullName: "owner/repo-1"}},
@@ -242,7 +241,7 @@ func TestModelIgnoresLateMoreReposLoadedAfterSelection(t *testing.T) {
 		t.Fatalf("repoPage = %d, want 1", um.repoPage)
 	}
 	if um.repoLoadingMore {
-		t.Fatal("repoLoadingMore = true, want false after late pagination result is ignored")
+		t.Fatal("repoLoadingMore = true, want false after leaving repo picker")
 	}
 	if cmd != nil {
 		t.Fatalf("cmd after late moreReposLoadedMsg = %v, want nil", cmd)
@@ -256,7 +255,6 @@ func TestModelIgnoresLateMoreReposFailedAfterSelection(t *testing.T) {
 	m.phase = phaseDeploymentLoading
 	m.selectedRepo = "owner/repo-1"
 	m.repoPickerSession = 1
-	m.repoLoadingMore = true
 
 	updated, cmd := m.Update(moreReposFailedMsg{sessionID: 1, err: "network timeout"})
 
@@ -286,6 +284,7 @@ func TestModelIgnoresStaleMoreReposLoadedAfterReturningToPicker(t *testing.T) {
 	m.repoPickerSession = 2
 	m.repoPage = 1
 	m.repoHasMore = true
+	m.repoLoadingMore = true
 
 	items := []list.Item{
 		repoItem{repo: githubapi.Repository{FullName: "owner/repo-1"}},
@@ -308,6 +307,9 @@ func TestModelIgnoresStaleMoreReposLoadedAfterReturningToPicker(t *testing.T) {
 	if um.repoPage != 1 {
 		t.Fatalf("repoPage = %d, want 1 after ignoring stale response", um.repoPage)
 	}
+	if !um.repoLoadingMore {
+		t.Fatal("repoLoadingMore = false, want true so stale success cannot clear the active session guard")
+	}
 	if len(um.repoList.Items()) != 2 {
 		t.Fatalf("repoList items length = %d, want 2 after ignoring stale response", len(um.repoList.Items()))
 	}
@@ -322,6 +324,7 @@ func TestModelIgnoresStaleMoreReposFailedAfterReturningToPicker(t *testing.T) {
 	m := NewModel(ctx, client, false, false)
 	m.phase = phaseRepoPicker
 	m.repoPickerSession = 2
+	m.repoLoadingMore = true
 
 	updated, cmd := m.Update(moreReposFailedMsg{sessionID: 1, err: "network timeout"})
 
@@ -332,8 +335,8 @@ func TestModelIgnoresStaleMoreReposFailedAfterReturningToPicker(t *testing.T) {
 	if um.fatalError != "" {
 		t.Fatalf("fatalError = %q, want empty", um.fatalError)
 	}
-	if um.repoLoadingMore {
-		t.Fatal("repoLoadingMore = true, want false after ignoring stale failure")
+	if !um.repoLoadingMore {
+		t.Fatal("repoLoadingMore = false, want true so stale failure cannot clear the active session guard")
 	}
 	if cmd != nil {
 		t.Fatalf("cmd after stale moreReposFailedMsg = %v, want nil", cmd)

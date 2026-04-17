@@ -146,7 +146,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case moreReposLoadedMsg:
 		if m.phase != phaseRepoPicker || msg.sessionID != m.repoPickerSession {
-			m.repoLoadingMore = false
 			return m, nil
 		}
 		m.repoPage++
@@ -166,7 +165,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case moreReposFailedMsg:
 		if m.phase != phaseRepoPicker || msg.sessionID != m.repoPickerSession {
-			m.repoLoadingMore = false
 			return m, nil
 		}
 		m.repoLoadingMore = false
