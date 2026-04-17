@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 
 	"gh-depdash/internal/githubapi"
 	"gh-depdash/internal/output"
@@ -13,7 +14,7 @@ import (
 func LoadDeploymentsForRepo(ctx context.Context, client githubapi.Client, owner, repo string, includePlans, verbose bool) ([]output.ViewRow, []string, error) {
 	rows, partialFailures, err := buildRows(ctx, client, owner, repo, includePlans, verbose)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.New(classifyBuildError(owner, repo, err))
 	}
 	return output.ToViewRows(rows), partialFailures, nil
 }

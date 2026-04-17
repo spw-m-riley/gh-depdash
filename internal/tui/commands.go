@@ -57,7 +57,7 @@ func loadDeployments(ctx context.Context, client githubapi.Client, repo string, 
 
 		items, partialFailures, err := loadDeploymentsForRepo(ctx, client, owner, repoName, includePlans, verbose)
 		if err != nil {
-			return deploymentsFatalErrorMsg{err: fmt.Sprintf("error loading deployments for %s/%s: %v", owner, repoName, err)}
+			return deploymentsFatalErrorMsg{err: err.Error()}
 		}
 
 		return deploymentsLoadedMsg{rows: items, partialFailures: partialFailures}

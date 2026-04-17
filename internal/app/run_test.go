@@ -795,3 +795,19 @@ func TestLoadDeploymentsForRepoPreservesPartialFailures(t *testing.T) {
 		t.Errorf("items[2] = %+v, want %+v", items[2], wantProd)
 	}
 }
+
+func TestLoadDeploymentsForRepoClassifiesFatalErrors(t *testing.T) {
+	client := fixtureClient{
+		environmentsErr: &api.HTTPError{
+			StatusCode: 403,
+		},
+	}
+
+	_, _, err := LoadDeploymentsForRepo(context.Background(), client, "octo", "example", false, false)
+	if err == nil {
+		t.Fatal("LoadDeploymentsForRepo() error = nil, want non-nil")
+	}
+	if !strings.Contains(err.Error(), "repository access denied for octo/example") {
+		t.Fatalf("error = %v, want repository access denied guidance", err)
+	}
+}
