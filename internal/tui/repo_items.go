@@ -56,22 +56,22 @@ func renderRepoItem(w io.Writer, m list.Model, index int, item repoItem) {
 	var title, desc string
 
 	title = item.repo.FullName
-	
+
 	var parts []string
 	if item.repo.Description != nil && *item.repo.Description != "" {
 		parts = append(parts, *item.repo.Description)
 	}
-	
+
 	if item.repo.Private {
 		parts = append(parts, privateStyle.Render("private"))
 	}
-	
+
 	if item.repo.UpdatedAt != "" {
 		if t, err := time.Parse(time.RFC3339, item.repo.UpdatedAt); err == nil {
 			parts = append(parts, fmt.Sprintf("updated %s", formatTimeAgo(t)))
 		}
 	}
-	
+
 	desc = descStyle.Render(strings.Join(parts, " • "))
 
 	str := fmt.Sprintf("%s\n%s", title, desc)

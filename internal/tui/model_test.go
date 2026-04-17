@@ -80,6 +80,41 @@ func TestModelRepoPicker(t *testing.T) {
 	}
 }
 
+func TestModelAppliesInitialWindowSizeWhenPickerLoads(t *testing.T) {
+	ctx := context.Background()
+	client := &stubClient{}
+	m := NewModel(ctx, client, false, false)
+
+	resized, cmd := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	if cmd != nil {
+		t.Fatalf("cmd after WindowSizeMsg = %v, want nil", cmd)
+	}
+
+	desc := "test repo"
+	updated, cmd := resized.(Model).Update(repoPageLoadedMsg{
+		repos: []githubapi.Repository{
+			{FullName: "owner/repo1", Description: &desc},
+		},
+		hasMore: false,
+	})
+
+	um := updated.(Model)
+	if um.phase != phaseRepoPicker {
+		t.Fatalf("phase after repoPageLoadedMsg = %v, want %v", um.phase, phaseRepoPicker)
+	}
+
+	h, v := docStyle.GetFrameSize()
+	if got, want := um.repoList.Width(), 120-h; got != want {
+		t.Fatalf("repoList.Width() = %d, want %d", got, want)
+	}
+	if got, want := um.repoList.Height(), 40-v; got != want {
+		t.Fatalf("repoList.Height() = %d, want %d", got, want)
+	}
+	if cmd != nil {
+		t.Fatalf("cmd after repoPageLoadedMsg = %v, want nil", cmd)
+	}
+}
+
 func TestModelLoadMoreRepos(t *testing.T) {
 	ctx := context.Background()
 	client := &stubClient{}

@@ -28,10 +28,10 @@ func newDeploymentItem(row output.ViewRow) deploymentItem {
 
 func renderDeploymentItem(item deploymentItem, verbose bool) string {
 	var b strings.Builder
-	
+
 	envStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("81"))
 	b.WriteString(envStyle.Render(item.environment))
-	
+
 	if item.branch != "" && item.date != "" {
 		b.WriteString("\n  ")
 		b.WriteString(successStyle.Render("✓"))
@@ -44,7 +44,7 @@ func renderDeploymentItem(item deploymentItem, verbose bool) string {
 		statusIcon := "•"
 		statusText := item.status
 		statusColor := lipgloss.Color("241")
-		
+
 		switch item.status {
 		case "success", "inactive":
 			statusIcon = "✓"
@@ -60,18 +60,18 @@ func renderDeploymentItem(item deploymentItem, verbose bool) string {
 			statusIcon = "○"
 			statusColor = lipgloss.Color("246")
 		}
-		
+
 		statusStyle := lipgloss.NewStyle().Foreground(statusColor)
 		b.WriteString(statusStyle.Render(statusIcon))
 		b.WriteString(" ")
 		b.WriteString(statusText)
 	}
-	
+
 	if verbose && item.logURL != "" {
 		b.WriteString("\n  ")
 		b.WriteString(subtleStyle.Render("Log: "))
 		b.WriteString(item.logURL)
 	}
-	
+
 	return b.String()
 }

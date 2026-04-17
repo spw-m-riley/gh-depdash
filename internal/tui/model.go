@@ -36,6 +36,8 @@ type Model struct {
 	repoPickerSession int
 	repoHasMore       bool
 	repoLoadingMore   bool
+	windowWidth       int
+	windowHeight      int
 	selectedRepo      string
 	deploymentRows    []output.ViewRow
 	partialFailures   []string
@@ -125,9 +127,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.WindowSizeMsg:
+		m.windowWidth = msg.Width
+		m.windowHeight = msg.Height
 		if m.phase == phaseRepoPicker {
-			h, v := docStyle.GetFrameSize()
-			m.repoList.SetSize(msg.Width-h, msg.Height-v)
+			m.applyRepoListSize()
 		}
 
 	case repoPageLoadedMsg:
@@ -137,6 +140,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		items := repoItemsFromRepositories(msg.repos, msg.hasMore)
 		m.repoList.SetItems(items)
 		m.phase = phaseRepoPicker
+		m.applyRepoListSize()
 		return m, nil
 
 	case repoPageFailedMsg:
@@ -188,6 +192,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.deploymentRows = nil
 		m.partialFailures = nil
 		m.selectedRepo = ""
+		m.applyRepoListSize()
 		return m, nil
 
 	case spinner.TickMsg:
@@ -227,6 +232,14 @@ func (m Model) View() string {
 	default:
 		return ""
 	}
+}
+
+func (m *Model) applyRepoListSize() {
+	if m.windowWidth == 0 || m.windowHeight == 0 {
+		return
+	}
+	h, v := docStyle.GetFrameSize()
+	m.repoList.SetSize(m.windowWidth-h, m.windowHeight-v)
 }
 
 func NewModelForDirectRepo(ctx context.Context, client githubapi.Client, repo string, includePlans, verbose bool) Model {

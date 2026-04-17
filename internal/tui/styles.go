@@ -40,7 +40,7 @@ func renderDeploymentBrowser(rows []output.ViewRow, partialFailures []string, ve
 	b.WriteString("\n")
 	b.WriteString(titleStyle.Render("Deployment Status"))
 	b.WriteString("\n\n")
-	
+
 	if len(rows) == 0 && len(partialFailures) == 0 {
 		b.WriteString(subtleStyle.Render("No deployments found"))
 		b.WriteString("\n")
@@ -51,7 +51,7 @@ func renderDeploymentBrowser(rows []output.ViewRow, partialFailures []string, ve
 			b.WriteString("\n\n")
 		}
 	}
-	
+
 	if len(partialFailures) > 0 {
 		b.WriteString(errorStyle.Render("Partial failures:"))
 		b.WriteString("\n")
@@ -62,7 +62,7 @@ func renderDeploymentBrowser(rows []output.ViewRow, partialFailures []string, ve
 		}
 		b.WriteString("\n")
 	}
-	
+
 	b.WriteString(subtleStyle.Render("Press 'b' to go back, 'q' or ctrl+c to quit"))
 	b.WriteString("\n")
 	return b.String()
