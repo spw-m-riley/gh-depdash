@@ -32,3 +32,30 @@ func TestRenderRepoItemNormalizesDescriptionWhitespace(t *testing.T) {
 		t.Fatalf("output = %q, want normalized single-line description", output)
 	}
 }
+
+func TestRenderRepoItemStripsANSIAndControlCharacters(t *testing.T) {
+	description := "alert \x1b[31mred\x1b[0m text\x07 done"
+	item := repoItem{repo: githubapi.Repository{
+		FullName:    "owner/repo",
+		Description: &description,
+	}}
+
+	model := list.New([]list.Item{item}, itemDelegate{}, 80, 20)
+
+	var rendered strings.Builder
+	renderRepoItem(&rendered, model, 1, item)
+
+	output := rendered.String()
+	if strings.Contains(output, "\x1b") {
+		t.Fatalf("output = %q, want ANSI escape bytes removed", output)
+	}
+	if strings.ContainsAny(output, "\x07") {
+		t.Fatalf("output = %q, want control characters removed", output)
+	}
+	if strings.Contains(output, "[31m") || strings.Contains(output, "[0m") {
+		t.Fatalf("output = %q, want ANSI control sequences removed", output)
+	}
+	if !strings.Contains(output, "alert red text done") {
+		t.Fatalf("output = %q, want sanitized single-line description", output)
+	}
+}

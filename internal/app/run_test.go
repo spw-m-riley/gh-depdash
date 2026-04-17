@@ -631,14 +631,14 @@ func (c fixtureClient) ListDeploymentStatuses(owner, repo string, deploymentID i
 	return slices.Clone(c.statuses[deploymentID]), nil
 }
 
-func (c fixtureClient) ListRepositories(page, perPage int) ([]githubapi.Repository, error) {
+func (c fixtureClient) ListRepositories(page, perPage int) (githubapi.RepositoryPage, error) {
 	if c.repositoriesErr != nil {
-		return nil, c.repositoriesErr
+		return githubapi.RepositoryPage{}, c.repositoriesErr
 	}
 	if c.repositories == nil {
-		return nil, nil
+		return githubapi.RepositoryPage{}, nil
 	}
-	return slices.Clone(c.repositories), nil
+	return githubapi.RepositoryPage{Repositories: slices.Clone(c.repositories)}, nil
 }
 
 func mustParseURL(t *testing.T, raw string) *url.URL {

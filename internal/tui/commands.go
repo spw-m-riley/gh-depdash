@@ -25,26 +25,24 @@ func SetDeploymentLoader(fn func(context.Context, githubapi.Client, string, stri
 
 func loadRepoPage(ctx context.Context, client githubapi.Client) tea.Cmd {
 	return func() tea.Msg {
-		repos, err := client.ListRepositories(1, perPage)
+		page, err := client.ListRepositories(1, perPage)
 		if err != nil {
 			return repoPageFailedMsg{err: formatRepositoryLoadError("failed to list repositories", err)}
 		}
 
-		hasMore := len(repos) >= perPage
-		return repoPageLoadedMsg{repos: repos, hasMore: hasMore}
+		return repoPageLoadedMsg{repos: page.Repositories, hasMore: page.HasMore}
 	}
 }
 
 func loadMoreRepos(ctx context.Context, client githubapi.Client, currentPage, sessionID int) tea.Cmd {
 	return func() tea.Msg {
 		nextPage := currentPage + 1
-		repos, err := client.ListRepositories(nextPage, perPage)
+		page, err := client.ListRepositories(nextPage, perPage)
 		if err != nil {
 			return moreReposFailedMsg{sessionID: sessionID, err: formatRepositoryLoadError("failed to load more repositories", err)}
 		}
 
-		hasMore := len(repos) >= perPage
-		return moreReposLoadedMsg{sessionID: sessionID, repos: repos, hasMore: hasMore}
+		return moreReposLoadedMsg{sessionID: sessionID, repos: page.Repositories, hasMore: page.HasMore}
 	}
 }
 

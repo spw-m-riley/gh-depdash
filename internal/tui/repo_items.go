@@ -3,8 +3,10 @@ package tui
 import (
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
@@ -19,6 +21,7 @@ var (
 	descStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 	privateStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("208"))
 	loadMoreStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("33")).PaddingLeft(4)
+	ansiEscapePattern = regexp.MustCompile(`\x1b([@-Z\\-_]|\[[0-?]*[ -/]*[@-~])`)
 )
 
 type repoItem struct {
@@ -148,5 +151,12 @@ func repoItemsFromRepositories(repos []githubapi.Repository, hasMore bool) []lis
 }
 
 func normalizeRepoDescription(description string) string {
+	description = ansiEscapePattern.ReplaceAllString(description, "")
+	description = strings.Map(func(r rune) rune {
+		if unicode.IsPrint(r) || unicode.IsSpace(r) {
+			return r
+		}
+		return -1
+	}, description)
 	return strings.Join(strings.Fields(description), " ")
 }

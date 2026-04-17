@@ -31,9 +31,14 @@ type Repository struct {
 	UpdatedAt   string                `json:"updated_at"`
 }
 
+type RepositoryPage struct {
+	Repositories []Repository
+	HasMore      bool
+}
+
 type Client interface {
 	ListEnvironments(owner, repo string) ([]Environment, error)
 	ListDeployments(owner, repo, environment string) ([]Deployment, error)
 	ListDeploymentStatuses(owner, repo string, deploymentID int64) ([]DeploymentStatus, error)
-	ListRepositories(page, perPage int) ([]Repository, error)
+	ListRepositories(page, perPage int) (RepositoryPage, error)
 }

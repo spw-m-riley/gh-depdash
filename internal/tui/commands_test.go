@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"gh-depdash/internal/githubapi"
@@ -38,6 +39,38 @@ func TestLoadMoreReposAvoidsDuplicateRepositoryPrefix(t *testing.T) {
 	}
 }
 
+func TestLoadRepoPageDoesNotAssumeMoreFromExactPageSize(t *testing.T) {
+	msg := loadRepoPage(context.Background(), repoPageClient{
+		pages: map[int][]githubapi.Repository{
+			1: makeRepositories(perPage),
+		},
+	})()
+
+	loadedMsg, ok := msg.(repoPageLoadedMsg)
+	if !ok {
+		t.Fatalf("message type = %T, want repoPageLoadedMsg", msg)
+	}
+	if loadedMsg.hasMore {
+		t.Fatal("repoPageLoadedMsg.hasMore = true, want false for an exact final page")
+	}
+}
+
+func TestLoadMoreReposDoesNotAssumeMoreFromExactPageSize(t *testing.T) {
+	msg := loadMoreRepos(context.Background(), repoPageClient{
+		pages: map[int][]githubapi.Repository{
+			2: makeRepositories(perPage),
+		},
+	}, 1, 7)()
+
+	loadedMsg, ok := msg.(moreReposLoadedMsg)
+	if !ok {
+		t.Fatalf("message type = %T, want moreReposLoadedMsg", msg)
+	}
+	if loadedMsg.hasMore {
+		t.Fatal("moreReposLoadedMsg.hasMore = true, want false for an exact final page")
+	}
+}
+
 func TestLoadDeploymentsPreservesActionableErrors(t *testing.T) {
 	previous := loadDeploymentsForRepo
 	loadDeploymentsForRepo = func(ctx context.Context, client githubapi.Client, owner, repo string, includePlans, verbose bool) ([]output.ViewRow, []string, error) {
@@ -70,4 +103,36 @@ func TestLoadDeploymentsRejectsInvalidRepoTarget(t *testing.T) {
 	if fatalMsg.err != want {
 		t.Fatalf("deploymentsFatalErrorMsg.err = %q, want %q", fatalMsg.err, want)
 	}
+}
+
+type repoPageClient struct {
+	pages   map[int][]githubapi.Repository
+	hasMore map[int]bool
+}
+
+func (c repoPageClient) ListEnvironments(owner, repo string) ([]githubapi.Environment, error) {
+	return nil, fmt.Errorf("unexpected ListEnvironments call")
+}
+
+func (c repoPageClient) ListDeployments(owner, repo, environment string) ([]githubapi.Deployment, error) {
+	return nil, fmt.Errorf("unexpected ListDeployments call")
+}
+
+func (c repoPageClient) ListDeploymentStatuses(owner, repo string, deploymentID int64) ([]githubapi.DeploymentStatus, error) {
+	return nil, fmt.Errorf("unexpected ListDeploymentStatuses call")
+}
+
+func (c repoPageClient) ListRepositories(page, perPage int) (githubapi.RepositoryPage, error) {
+	return githubapi.RepositoryPage{
+		Repositories: c.pages[page],
+		HasMore:      c.hasMore[page],
+	}, nil
+}
+
+func makeRepositories(count int) []githubapi.Repository {
+	repos := make([]githubapi.Repository, 0, count)
+	for i := 0; i < count; i++ {
+		repos = append(repos, githubapi.Repository{FullName: fmt.Sprintf("octo/repo-%d", i)})
+	}
+	return repos
 }

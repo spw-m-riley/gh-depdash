@@ -679,10 +679,12 @@ func (c *stubClient) ListDeploymentStatuses(owner, repo string, deploymentID int
 	return []githubapi.DeploymentStatus{{State: "success"}}, nil
 }
 
-func (c *stubClient) ListRepositories(page, perPage int) ([]githubapi.Repository, error) {
+func (c *stubClient) ListRepositories(page, perPage int) (githubapi.RepositoryPage, error) {
 	desc := "test repo"
-	return []githubapi.Repository{
-		{FullName: "owner/repo", Description: &desc},
+	return githubapi.RepositoryPage{
+		Repositories: []githubapi.Repository{
+			{FullName: "owner/repo", Description: &desc},
+		},
 	}, nil
 }
 
@@ -719,6 +721,6 @@ func (c *errorClient) ListDeploymentStatuses(owner, repo string, deploymentID in
 	return nil, fmt.Errorf("%s", c.err)
 }
 
-func (c *errorClient) ListRepositories(page, perPage int) ([]githubapi.Repository, error) {
-	return nil, fmt.Errorf("%s", c.err)
+func (c *errorClient) ListRepositories(page, perPage int) (githubapi.RepositoryPage, error) {
+	return githubapi.RepositoryPage{}, fmt.Errorf("%s", c.err)
 }

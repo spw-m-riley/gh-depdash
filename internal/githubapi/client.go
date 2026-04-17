@@ -1,8 +1,11 @@
 package githubapi
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/cli/go-gh/v2/pkg/api"
 )
@@ -52,14 +55,23 @@ func (c *RESTClient) ListDeploymentStatuses(owner, repo string, deploymentID int
 	return statuses, nil
 }
 
-func (c *RESTClient) ListRepositories(page, perPage int) ([]Repository, error) {
+func (c *RESTClient) ListRepositories(page, perPage int) (RepositoryPage, error) {
 	var repos []Repository
 
-	if err := c.client.Get(reposPath(page, perPage), &repos); err != nil {
-		return nil, fmt.Errorf("list repositories: %w", err)
+	resp, err := c.client.Request(http.MethodGet, reposPath(page, perPage), nil)
+	if err != nil {
+		return RepositoryPage{}, fmt.Errorf("list repositories: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if err := json.NewDecoder(resp.Body).Decode(&repos); err != nil {
+		return RepositoryPage{}, fmt.Errorf("list repositories: %w", err)
 	}
 
-	return repos, nil
+	return RepositoryPage{
+		Repositories: repos,
+		HasMore:      hasNextPage(resp.Header.Get("Link")),
+	}, nil
 }
 
 func envPath(owner, repo string) string {
@@ -89,4 +101,13 @@ func reposPath(page, perPage int) string {
 	query.Set("page", fmt.Sprintf("%d", page))
 
 	return fmt.Sprintf("user/repos?%s", query.Encode())
+}
+
+func hasNextPage(linkHeader string) bool {
+	for _, part := range strings.Split(linkHeader, ",") {
+		if strings.Contains(part, `rel="next"`) {
+			return true
+		}
+	}
+	return false
 }

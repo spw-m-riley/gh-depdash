@@ -216,7 +216,7 @@ func (orderingClient) ListDeploymentStatuses(owner, repo string, deploymentID in
 	return nil, nil
 }
 
-func (c orderingClient) ListRepositories(page, perPage int) ([]githubapi.Repository, error) {
+func (c orderingClient) ListRepositories(page, perPage int) (githubapi.RepositoryPage, error) {
 	return c.base.ListRepositories(page, perPage)
 }
 
@@ -237,7 +237,7 @@ func (c singleEnvironmentClient) ListDeploymentStatuses(owner, repo string, depl
 	return c.base.ListDeploymentStatuses(owner, repo, deploymentID)
 }
 
-func (c singleEnvironmentClient) ListRepositories(page, perPage int) ([]githubapi.Repository, error) {
+func (c singleEnvironmentClient) ListRepositories(page, perPage int) (githubapi.RepositoryPage, error) {
 	return c.base.ListRepositories(page, perPage)
 }
 
