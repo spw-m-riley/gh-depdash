@@ -58,3 +58,16 @@ func TestLoadDeploymentsPreservesActionableErrors(t *testing.T) {
 		t.Fatalf("deploymentsFatalErrorMsg.err = %q, want %q", fatalMsg.err, want)
 	}
 }
+
+func TestLoadDeploymentsRejectsInvalidRepoTarget(t *testing.T) {
+	msg := loadDeployments(context.Background(), &stubClient{}, "octo/example/extra", false, false)()
+
+	fatalMsg, ok := msg.(deploymentsFatalErrorMsg)
+	if !ok {
+		t.Fatalf("message type = %T, want deploymentsFatalErrorMsg", msg)
+	}
+	want := `invalid repo target "octo/example/extra": expected <owner/repo>`
+	if fatalMsg.err != want {
+		t.Fatalf("deploymentsFatalErrorMsg.err = %q, want %q", fatalMsg.err, want)
+	}
+}

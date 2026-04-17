@@ -51,7 +51,7 @@ func loadMoreRepos(ctx context.Context, client githubapi.Client, currentPage, se
 func loadDeployments(ctx context.Context, client githubapi.Client, repo string, includePlans, verbose bool) tea.Cmd {
 	return func() tea.Msg {
 		owner, repoName, ok := strings.Cut(repo, "/")
-		if !ok || owner == "" || repoName == "" {
+		if !ok || owner == "" || repoName == "" || strings.Contains(repoName, "/") {
 			return deploymentsFatalErrorMsg{err: fmt.Sprintf("invalid repo target %q: expected <owner/repo>", repo)}
 		}
 
