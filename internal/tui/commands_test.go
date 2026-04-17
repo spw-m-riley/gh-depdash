@@ -9,6 +9,35 @@ import (
 	"gh-depdash/internal/output"
 )
 
+func TestLoadRepoPageAvoidsDuplicateRepositoryPrefix(t *testing.T) {
+	msg := loadRepoPage(context.Background(), &errorClient{err: "list repositories: network error"})()
+
+	failedMsg, ok := msg.(repoPageFailedMsg)
+	if !ok {
+		t.Fatalf("message type = %T, want repoPageFailedMsg", msg)
+	}
+	want := "failed to list repositories: network error"
+	if failedMsg.err != want {
+		t.Fatalf("repoPageFailedMsg.err = %q, want %q", failedMsg.err, want)
+	}
+}
+
+func TestLoadMoreReposAvoidsDuplicateRepositoryPrefix(t *testing.T) {
+	msg := loadMoreRepos(context.Background(), &errorClient{err: "list repositories: network error"}, 1, 7)()
+
+	failedMsg, ok := msg.(moreReposFailedMsg)
+	if !ok {
+		t.Fatalf("message type = %T, want moreReposFailedMsg", msg)
+	}
+	if failedMsg.sessionID != 7 {
+		t.Fatalf("moreReposFailedMsg.sessionID = %d, want 7", failedMsg.sessionID)
+	}
+	want := "failed to load more repositories: network error"
+	if failedMsg.err != want {
+		t.Fatalf("moreReposFailedMsg.err = %q, want %q", failedMsg.err, want)
+	}
+}
+
 func TestLoadDeploymentsPreservesActionableErrors(t *testing.T) {
 	previous := loadDeploymentsForRepo
 	loadDeploymentsForRepo = func(ctx context.Context, client githubapi.Client, owner, repo string, includePlans, verbose bool) ([]output.ViewRow, []string, error) {

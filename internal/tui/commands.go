@@ -27,7 +27,7 @@ func loadRepoPage(ctx context.Context, client githubapi.Client) tea.Cmd {
 	return func() tea.Msg {
 		repos, err := client.ListRepositories(1, perPage)
 		if err != nil {
-			return repoPageFailedMsg{err: fmt.Sprintf("failed to list repositories: %v", err)}
+			return repoPageFailedMsg{err: formatRepositoryLoadError("failed to list repositories", err)}
 		}
 
 		hasMore := len(repos) >= perPage
@@ -40,7 +40,7 @@ func loadMoreRepos(ctx context.Context, client githubapi.Client, currentPage, se
 		nextPage := currentPage + 1
 		repos, err := client.ListRepositories(nextPage, perPage)
 		if err != nil {
-			return moreReposFailedMsg{sessionID: sessionID, err: fmt.Sprintf("failed to load more repositories: %v", err)}
+			return moreReposFailedMsg{sessionID: sessionID, err: formatRepositoryLoadError("failed to load more repositories", err)}
 		}
 
 		hasMore := len(repos) >= perPage
@@ -62,4 +62,9 @@ func loadDeployments(ctx context.Context, client githubapi.Client, repo string, 
 
 		return deploymentsLoadedMsg{rows: items, partialFailures: partialFailures}
 	}
+}
+
+func formatRepositoryLoadError(prefix string, err error) string {
+	message := strings.TrimPrefix(err.Error(), "list repositories: ")
+	return fmt.Sprintf("%s: %s", prefix, message)
 }
