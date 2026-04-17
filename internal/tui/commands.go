@@ -35,16 +35,16 @@ func loadRepoPage(ctx context.Context, client githubapi.Client) tea.Cmd {
 	}
 }
 
-func loadMoreRepos(ctx context.Context, client githubapi.Client, currentPage int) tea.Cmd {
+func loadMoreRepos(ctx context.Context, client githubapi.Client, currentPage, sessionID int) tea.Cmd {
 	return func() tea.Msg {
 		nextPage := currentPage + 1
 		repos, err := client.ListRepositories(nextPage, perPage)
 		if err != nil {
-			return moreReposFailedMsg{err: fmt.Sprintf("failed to load more repositories: %v", err)}
+			return moreReposFailedMsg{sessionID: sessionID, err: fmt.Sprintf("failed to load more repositories: %v", err)}
 		}
 
 		hasMore := len(repos) >= perPage
-		return moreReposLoadedMsg{repos: repos, hasMore: hasMore}
+		return moreReposLoadedMsg{sessionID: sessionID, repos: repos, hasMore: hasMore}
 	}
 }
 

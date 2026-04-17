@@ -15,12 +15,14 @@ type repoPageFailedMsg struct {
 }
 
 type moreReposLoadedMsg struct {
-	repos   []githubapi.Repository
-	hasMore bool
+	sessionID int
+	repos     []githubapi.Repository
+	hasMore   bool
 }
 
 type moreReposFailedMsg struct {
-	err string
+	sessionID int
+	err       string
 }
 
 type deploymentsLoadedMsg struct {

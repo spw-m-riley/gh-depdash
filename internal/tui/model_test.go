@@ -175,12 +175,44 @@ func TestModelLoadMoreReposIgnoresDuplicateEnterWhileLoading(t *testing.T) {
 	}
 }
 
+func TestModelRepoSelectionInvalidatesInFlightLoadMore(t *testing.T) {
+	ctx := context.Background()
+	client := &stubClient{}
+	m := NewModel(ctx, client, false, false)
+	m.phase = phaseRepoPicker
+	m.repoPickerSession = 1
+	m.repoLoadingMore = true
+
+	desc := "test"
+	items := repoItemsFromRepositories([]githubapi.Repository{
+		{FullName: "owner/repo1", Description: &desc},
+	}, false)
+	m.repoList.SetItems(items)
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+	um := updated.(Model)
+	if um.phase != phaseDeploymentLoading {
+		t.Fatalf("phase after repo selection = %v, want %v", um.phase, phaseDeploymentLoading)
+	}
+	if um.repoPickerSession != 2 {
+		t.Fatalf("repoPickerSession = %d, want 2 after invalidating in-flight load-more requests", um.repoPickerSession)
+	}
+	if um.repoLoadingMore {
+		t.Fatal("repoLoadingMore = true, want false after leaving repo picker")
+	}
+	if cmd == nil {
+		t.Fatal("cmd after repo selection = nil, want deployment loading command")
+	}
+}
+
 func TestModelIgnoresLateMoreReposLoadedAfterSelection(t *testing.T) {
 	ctx := context.Background()
 	client := &stubClient{}
 	m := NewModel(ctx, client, false, false)
 	m.phase = phaseDeploymentLoading
 	m.selectedRepo = "owner/repo-1"
+	m.repoPickerSession = 1
 	m.repoPage = 1
 	m.repoHasMore = true
 	m.repoLoadingMore = true
@@ -192,6 +224,7 @@ func TestModelIgnoresLateMoreReposLoadedAfterSelection(t *testing.T) {
 	m.repoList.SetItems(items)
 
 	updated, cmd := m.Update(moreReposLoadedMsg{
+		sessionID: 1,
 		repos: []githubapi.Repository{
 			{FullName: "owner/repo-2"},
 		},
@@ -222,9 +255,10 @@ func TestModelIgnoresLateMoreReposFailedAfterSelection(t *testing.T) {
 	m := NewModel(ctx, client, false, false)
 	m.phase = phaseDeploymentLoading
 	m.selectedRepo = "owner/repo-1"
+	m.repoPickerSession = 1
 	m.repoLoadingMore = true
 
-	updated, cmd := m.Update(moreReposFailedMsg{err: "network timeout"})
+	updated, cmd := m.Update(moreReposFailedMsg{sessionID: 1, err: "network timeout"})
 
 	um := updated.(Model)
 	if um.phase != phaseDeploymentLoading {
@@ -241,6 +275,68 @@ func TestModelIgnoresLateMoreReposFailedAfterSelection(t *testing.T) {
 	}
 	if cmd != nil {
 		t.Fatalf("cmd after late moreReposFailedMsg = %v, want nil", cmd)
+	}
+}
+
+func TestModelIgnoresStaleMoreReposLoadedAfterReturningToPicker(t *testing.T) {
+	ctx := context.Background()
+	client := &stubClient{}
+	m := NewModel(ctx, client, false, false)
+	m.phase = phaseRepoPicker
+	m.repoPickerSession = 2
+	m.repoPage = 1
+	m.repoHasMore = true
+
+	items := []list.Item{
+		repoItem{repo: githubapi.Repository{FullName: "owner/repo-1"}},
+		loadMoreItem{},
+	}
+	m.repoList.SetItems(items)
+
+	updated, cmd := m.Update(moreReposLoadedMsg{
+		sessionID: 1,
+		repos: []githubapi.Repository{
+			{FullName: "owner/repo-2"},
+		},
+		hasMore: true,
+	})
+
+	um := updated.(Model)
+	if um.phase != phaseRepoPicker {
+		t.Fatalf("phase after stale moreReposLoadedMsg = %v, want %v", um.phase, phaseRepoPicker)
+	}
+	if um.repoPage != 1 {
+		t.Fatalf("repoPage = %d, want 1 after ignoring stale response", um.repoPage)
+	}
+	if len(um.repoList.Items()) != 2 {
+		t.Fatalf("repoList items length = %d, want 2 after ignoring stale response", len(um.repoList.Items()))
+	}
+	if cmd != nil {
+		t.Fatalf("cmd after stale moreReposLoadedMsg = %v, want nil", cmd)
+	}
+}
+
+func TestModelIgnoresStaleMoreReposFailedAfterReturningToPicker(t *testing.T) {
+	ctx := context.Background()
+	client := &stubClient{}
+	m := NewModel(ctx, client, false, false)
+	m.phase = phaseRepoPicker
+	m.repoPickerSession = 2
+
+	updated, cmd := m.Update(moreReposFailedMsg{sessionID: 1, err: "network timeout"})
+
+	um := updated.(Model)
+	if um.phase != phaseRepoPicker {
+		t.Fatalf("phase after stale moreReposFailedMsg = %v, want %v", um.phase, phaseRepoPicker)
+	}
+	if um.fatalError != "" {
+		t.Fatalf("fatalError = %q, want empty", um.fatalError)
+	}
+	if um.repoLoadingMore {
+		t.Fatal("repoLoadingMore = true, want false after ignoring stale failure")
+	}
+	if cmd != nil {
+		t.Fatalf("cmd after stale moreReposFailedMsg = %v, want nil", cmd)
 	}
 }
 

@@ -25,21 +25,22 @@ const (
 )
 
 type Model struct {
-	phase           phase
-	ctx             context.Context
-	client          githubapi.Client
-	repoSpinner     spinner.Model
-	deploySpinner   spinner.Model
-	fatalError      string
-	repoList        list.Model
-	repoPage        int
-	repoHasMore     bool
-	repoLoadingMore bool
-	selectedRepo    string
-	deploymentRows  []output.ViewRow
-	partialFailures []string
-	includePlans    bool
-	verbose         bool
+	phase             phase
+	ctx               context.Context
+	client            githubapi.Client
+	repoSpinner       spinner.Model
+	deploySpinner     spinner.Model
+	fatalError        string
+	repoList          list.Model
+	repoPage          int
+	repoPickerSession int
+	repoHasMore       bool
+	repoLoadingMore   bool
+	selectedRepo      string
+	deploymentRows    []output.ViewRow
+	partialFailures   []string
+	includePlans      bool
+	verbose           bool
 }
 
 func NewModel(ctx context.Context, client githubapi.Client, includePlans, verbose bool) Model {
@@ -96,6 +97,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				switch item := selected.(type) {
 				case repoItem:
+					m.repoPickerSession++
+					m.repoLoadingMore = false
 					m.selectedRepo = item.repo.FullName
 					m.phase = phaseDeploymentLoading
 					return m, tea.Batch(
@@ -107,7 +110,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return m, nil
 					}
 					m.repoLoadingMore = true
-					return m, loadMoreRepos(m.ctx, m.client, m.repoPage)
+					return m, loadMoreRepos(m.ctx, m.client, m.repoPage, m.repoPickerSession)
 				}
 			}
 		} else {
@@ -142,7 +145,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 
 	case moreReposLoadedMsg:
-		if m.phase != phaseRepoPicker {
+		if m.phase != phaseRepoPicker || msg.sessionID != m.repoPickerSession {
 			m.repoLoadingMore = false
 			return m, nil
 		}
@@ -162,7 +165,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case moreReposFailedMsg:
-		if m.phase != phaseRepoPicker {
+		if m.phase != phaseRepoPicker || msg.sessionID != m.repoPickerSession {
 			m.repoLoadingMore = false
 			return m, nil
 		}
