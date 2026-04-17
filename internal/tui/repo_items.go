@@ -59,7 +59,9 @@ func renderRepoItem(w io.Writer, m list.Model, index int, item repoItem) {
 
 	var parts []string
 	if item.repo.Description != nil && *item.repo.Description != "" {
-		parts = append(parts, *item.repo.Description)
+		if description := normalizeRepoDescription(*item.repo.Description); description != "" {
+			parts = append(parts, description)
+		}
 	}
 
 	if item.repo.Private {
@@ -143,4 +145,8 @@ func repoItemsFromRepositories(repos []githubapi.Repository, hasMore bool) []lis
 		items = append(items, loadMoreItem{})
 	}
 	return items
+}
+
+func normalizeRepoDescription(description string) string {
+	return strings.Join(strings.Fields(description), " ")
 }
