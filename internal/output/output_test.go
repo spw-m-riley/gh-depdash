@@ -52,6 +52,7 @@ func TestRenderJSON(t *testing.T) {
 		{
 			Environment: "Production",
 			Branch:      "main",
+			SHA:         "deadbeefcafe",
 			Date:        time.Date(2024, time.March, 14, 9, 26, 0, 0, time.UTC),
 			Status:      "success",
 			LogURL:      "https://example.com/log",
@@ -73,6 +74,7 @@ func TestRenderJSON(t *testing.T) {
 		{
 			Environment: "Production",
 			Branch:      "main",
+			SHA:         "deadbeefcafe",
 			Date:        "2024-03-14",
 			Status:      "success",
 			LogURL:      "https://example.com/log",
@@ -165,11 +167,69 @@ func TestRenderJSONPreservesLatestAttemptContextWithoutSuccess(t *testing.T) {
 	}
 }
 
+func TestRenderJSONSuccessfulRowIncludesSHA(t *testing.T) {
+	rows := []deployments.Row{
+		{
+			Environment: "Production",
+			Branch:      "main",
+			SHA:         "abc123sha",
+			Date:        time.Date(2024, time.March, 14, 9, 26, 0, 0, time.UTC),
+			Status:      "success",
+			LogURL:      "https://example.com/log",
+			HasSuccess:  true,
+		},
+	}
+
+	got, err := RenderJSON(rows)
+	if err != nil {
+		t.Fatalf("RenderJSON returned error: %v", err)
+	}
+
+	var decoded []ViewRow
+	if err := json.Unmarshal(got, &decoded); err != nil {
+		t.Fatalf("RenderJSON returned invalid json: %v", err)
+	}
+
+	if decoded[0].SHA != "abc123sha" {
+		t.Fatalf("SHA = %q, want %q", decoded[0].SHA, "abc123sha")
+	}
+}
+
+func TestRenderJSONNoSuccessRowOmitsSHA(t *testing.T) {
+	rows := []deployments.Row{
+		{
+			Environment: "Production",
+			Status:      "failure",
+			LogURL:      "https://example.com/failed-run",
+			HasSuccess:  false,
+		},
+	}
+
+	got, err := RenderJSON(rows)
+	if err != nil {
+		t.Fatalf("RenderJSON returned error: %v", err)
+	}
+
+	var decoded []map[string]json.RawMessage
+	if err := json.Unmarshal(got, &decoded); err != nil {
+		t.Fatalf("RenderJSON returned invalid json: %v", err)
+	}
+
+	if len(decoded) != 1 {
+		t.Fatalf("RenderJSON returned %d rows, want 1", len(decoded))
+	}
+
+	if _, ok := decoded[0]["sha"]; ok {
+		t.Fatalf("expected no sha field in JSON for no-success row, got: %s", got)
+	}
+}
+
 func TestToViewRowsIsExported(t *testing.T) {
 	rows := []deployments.Row{
 		{
 			Environment: "Staging",
 			Branch:      "feature/test",
+			SHA:         "c0ffee001",
 			Date:        time.Date(2024, time.April, 1, 12, 0, 0, 0, time.UTC),
 			Status:      "success",
 			LogURL:      "https://example.com/staging-log",
@@ -186,6 +246,7 @@ func TestToViewRowsIsExported(t *testing.T) {
 	want := ViewRow{
 		Environment: "Staging",
 		Branch:      "feature/test",
+		SHA:         "c0ffee001",
 		Date:        "2024-04-01",
 		Status:      "success",
 		LogURL:      "https://example.com/staging-log",

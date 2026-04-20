@@ -79,6 +79,39 @@ func TestBuildRowsTreatsInactiveAsHistoricalSuccess(t *testing.T) {
 	}
 }
 
+func TestBuildRowsSuccessfulDeploymentCarriesSHA(t *testing.T) {
+	rows, err := newFixtureService(t).BuildRows(context.Background(), "octo", "example", false)
+	if err != nil {
+		t.Fatalf("BuildRows() error = %v, want nil", err)
+	}
+
+	t.Run("UAT", func(t *testing.T) {
+		row := findRow(t, rows, "UAT")
+		if row.SHA != "sha-uat-winner" {
+			t.Fatalf("UAT SHA = %q, want %q", row.SHA, "sha-uat-winner")
+		}
+	})
+
+	t.Run("Development", func(t *testing.T) {
+		row := findRow(t, rows, "Development")
+		if row.SHA != "sha-dev-stable" {
+			t.Fatalf("Development SHA = %q, want %q", row.SHA, "sha-dev-stable")
+		}
+	})
+}
+
+func TestBuildRowsNoSuccessDeploymentHasBlankSHA(t *testing.T) {
+	rows, err := newFixtureService(t).BuildRows(context.Background(), "octo", "example", false)
+	if err != nil {
+		t.Fatalf("BuildRows() error = %v, want nil", err)
+	}
+
+	row := findRow(t, rows, "Production")
+	if row.SHA != "" {
+		t.Fatalf("Production SHA = %q, want blank", row.SHA)
+	}
+}
+
 func TestBuildRowsLeavesProductionBlankWhenOnlyWaitingAttemptExists(t *testing.T) {
 	rows, err := newFixtureService(t).BuildRows(context.Background(), "octo", "example", false)
 	if err != nil {
