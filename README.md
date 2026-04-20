@@ -2,7 +2,7 @@
 
 `gh-depdash` shows the latest successful deployment per stable environment for a target repository.
 
-In an interactive terminal, running `gh depdash` with no repo target opens a searchable repository picker and then a deployment browser. The deployment browser shows a short commit SHA (first 7 characters) alongside the branch and date for each successful deployment. Explicit repo targets default to JSON output; use `--verbose` to get the plain-table format instead.
+In an interactive terminal, running `gh depdash` with no repo target opens a searchable repository picker and then a deployment browser. The deployment browser shows a short commit SHA (first 7 characters) alongside the branch and date for each successful deployment. Explicit repo targets default to JSON output; use `--verbose` to get the verbose table format instead.
 
 By default it reports the stable environments only. `/Plan` environments are hidden unless `--plans` is passed.
 
