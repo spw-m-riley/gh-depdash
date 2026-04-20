@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/spw-m-riley/gh-depdash/compare/v1.3.0...v1.4.0) (2026-04-20)
+
+
+### Features
+
+* default explicit repo output to JSON and show mini SHA in TUI ([#8](https://github.com/spw-m-riley/gh-depdash/issues/8)) ([8804c87](https://github.com/spw-m-riley/gh-depdash/commit/8804c87d3a51b55886486643996a2aec2de9199a))
+
 ## [1.3.0](https://github.com/spw-m-riley/gh-depdash/compare/v1.2.0...v1.3.0) (2026-04-20)
 
 
