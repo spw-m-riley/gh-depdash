@@ -210,7 +210,16 @@ func TestRenderJSONNoSuccessRowOmitsSHA(t *testing.T) {
 		t.Fatalf("RenderJSON returned error: %v", err)
 	}
 
-	if strings.Contains(string(got), `"sha"`) {
+	var decoded []map[string]json.RawMessage
+	if err := json.Unmarshal(got, &decoded); err != nil {
+		t.Fatalf("RenderJSON returned invalid json: %v", err)
+	}
+
+	if len(decoded) != 1 {
+		t.Fatalf("RenderJSON returned %d rows, want 1", len(decoded))
+	}
+
+	if _, ok := decoded[0]["sha"]; ok {
 		t.Fatalf("expected no sha field in JSON for no-success row, got: %s", got)
 	}
 }
