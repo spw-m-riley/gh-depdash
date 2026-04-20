@@ -63,12 +63,12 @@ func TestRunDefaultTable(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	err := Run([]string{"octo/example"}, &stdout, &stderr)
+	err := Run([]string{"--verbose", "octo/example"}, &stdout, &stderr)
 	if err != nil {
 		t.Fatalf("Run() error = %v, want nil", err)
 	}
 
-	want := "Env | Branch | Date\nDevelopment | feature/dev-stable | 2024-03-14\nProduction | — | —\n"
+	want := "Env | Branch | Date | Status | Log URL\nDevelopment | feature/dev-stable | 2024-03-14 | success | https://example.com/dev\nProduction | — | — | queued | —\n"
 	if stdout.String() != want {
 		t.Fatalf("stdout = %q, want %q", stdout.String(), want)
 	}
@@ -135,12 +135,12 @@ func TestRunPlansPreservesPlanRows(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	err := Run([]string{"--repo", "octo/example", "--plans"}, &stdout, &stderr)
+	err := Run([]string{"--repo", "octo/example", "--plans", "--verbose"}, &stdout, &stderr)
 	if err != nil {
 		t.Fatalf("Run() error = %v, want nil", err)
 	}
 
-	want := "Env | Branch | Date\nDevelopment | feature/dev-stable | 2024-03-14\nDevelopment/Plan | feature/dev-plan | 2024-03-14\nProduction | main | 2024-03-14\n"
+	want := "Env | Branch | Date | Status | Log URL\nDevelopment | feature/dev-stable | 2024-03-14 | success | —\nDevelopment/Plan | feature/dev-plan | 2024-03-14 | success | —\nProduction | main | 2024-03-14 | success | —\n"
 	if stdout.String() != want {
 		t.Fatalf("stdout = %q, want %q", stdout.String(), want)
 	}
@@ -402,9 +402,12 @@ func TestRunExplicitRepoBypassesInteractiveOnTTY(t *testing.T) {
 		t.Fatalf("Run() error = %v, want nil", err)
 	}
 
-	want := "Env | Branch | Date\nProduction | main | 2024-03-14\n"
-	if stdout.String() != want {
-		t.Fatalf("stdout = %q, want %q", stdout.String(), want)
+	var decoded []output.ViewRow
+	if err := json.Unmarshal(stdout.Bytes(), &decoded); err != nil {
+		t.Fatalf("stdout is not valid JSON: %v\nstdout = %q", err, stdout.String())
+	}
+	if len(decoded) == 0 {
+		t.Fatalf("decoded output is empty, want at least one row")
 	}
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
@@ -809,5 +812,124 @@ func TestLoadDeploymentsForRepoClassifiesFatalErrors(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "repository access denied for octo/example") {
 		t.Fatalf("error = %v, want repository access denied guidance", err)
+	}
+}
+
+// singleSuccessClient returns a fixtureClient with one Production environment
+// and a successful deployment, useful for testing output-format decisions.
+func singleSuccessClient() fixtureClient {
+	return fixtureClient{
+		environments: []githubapi.Environment{
+			{Name: "Production"},
+		},
+		deployments: map[string][]githubapi.Deployment{
+			"Production": {
+				{
+					ID:        901,
+					Ref:       "main",
+					CreatedAt: "2024-06-01T10:00:00Z",
+				},
+			},
+		},
+		statuses: map[int64][]githubapi.DeploymentStatus{
+			901: {
+				{
+					State:     "success",
+					CreatedAt: "2024-06-01T10:05:00Z",
+					LogURL:    "https://example.com/prod",
+				},
+			},
+		},
+	}
+}
+
+func TestRunExplicitRepoDefaultsToJSON(t *testing.T) {
+	restore := stubNewGitHubClient(t, func() (githubapi.Client, error) {
+		return singleSuccessClient(), nil
+	})
+	defer restore()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := Run([]string{"octo/example"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("Run() error = %v, want nil", err)
+	}
+
+	var decoded []output.ViewRow
+	if err := json.Unmarshal(stdout.Bytes(), &decoded); err != nil {
+		t.Fatalf("stdout is not valid JSON: %v\nstdout = %q", err, stdout.String())
+	}
+
+	want := []output.ViewRow{{
+		Environment: "Production",
+		Branch:      "main",
+		Date:        "2024-06-01",
+		Status:      "success",
+		LogURL:      "https://example.com/prod",
+	}}
+	if !slices.Equal(decoded, want) {
+		t.Fatalf("decoded output = %#v, want %#v", decoded, want)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+}
+
+func TestRunExplicitRepoWithVerboseRendersVerboseTable(t *testing.T) {
+	restore := stubNewGitHubClient(t, func() (githubapi.Client, error) {
+		return singleSuccessClient(), nil
+	})
+	defer restore()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := Run([]string{"--verbose", "octo/example"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("Run() error = %v, want nil", err)
+	}
+
+	want := "Env | Branch | Date | Status | Log URL\nProduction | main | 2024-06-01 | success | https://example.com/prod\n"
+	if stdout.String() != want {
+		t.Fatalf("stdout = %q, want %q", stdout.String(), want)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+}
+
+func TestRunExplicitRepoJSONAndVerboseEmitsJSON(t *testing.T) {
+	restore := stubNewGitHubClient(t, func() (githubapi.Client, error) {
+		return singleSuccessClient(), nil
+	})
+	defer restore()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := Run([]string{"--json", "--verbose", "octo/example"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("Run() error = %v, want nil", err)
+	}
+
+	var decoded []output.ViewRow
+	if err := json.Unmarshal(stdout.Bytes(), &decoded); err != nil {
+		t.Fatalf("stdout is not valid JSON: %v\nstdout = %q", err, stdout.String())
+	}
+
+	want := []output.ViewRow{{
+		Environment: "Production",
+		Branch:      "main",
+		Date:        "2024-06-01",
+		Status:      "success",
+		LogURL:      "https://example.com/prod",
+	}}
+	if !slices.Equal(decoded, want) {
+		t.Fatalf("decoded output = %#v, want %#v", decoded, want)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
 }

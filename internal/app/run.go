@@ -71,7 +71,10 @@ func Run(args []string, stdout, stderr io.Writer) error {
 		return writeActionableError(stderr, classifyBuildError(owner, repo, err))
 	}
 
-	rendered, err := renderRows(rows, opts.JSON, opts.Verbose)
+	// Explicit repo targets default to JSON. --verbose switches to table.
+	// --json always wins: --json --verbose still emits JSON.
+	asJSON := opts.JSON || !opts.Verbose
+	rendered, err := renderRows(rows, asJSON, opts.Verbose)
 	if err != nil {
 		return err
 	}
