@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/spw-m-riley/gh-depdash/compare/v1.2.0...v1.3.0) (2026-04-20)
+
+
+### Features
+
+* add interactive repo picker and deployment browser ([#6](https://github.com/spw-m-riley/gh-depdash/issues/6)) ([15279e1](https://github.com/spw-m-riley/gh-depdash/commit/15279e13f58269d2cd5e8de41c95e4362916c430))
+
 ## [1.2.0](https://github.com/spw-m-riley/gh-depdash/compare/v1.1.1...v1.2.0) (2026-04-15)
 
 
