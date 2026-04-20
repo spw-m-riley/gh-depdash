@@ -11,6 +11,7 @@ import (
 type deploymentItem struct {
 	environment string
 	branch      string
+	sha         string
 	date        string
 	status      string
 	logURL      string
@@ -20,6 +21,7 @@ func newDeploymentItem(row output.ViewRow) deploymentItem {
 	return deploymentItem{
 		environment: row.Environment,
 		branch:      row.Branch,
+		sha:         row.SHA,
 		date:        row.Date,
 		status:      row.Status,
 		logURL:      row.LogURL,
@@ -37,6 +39,10 @@ func renderDeploymentItem(item deploymentItem, verbose bool) string {
 		b.WriteString(successStyle.Render("✓"))
 		b.WriteString(" ")
 		b.WriteString(item.branch)
+		if item.sha != "" {
+			b.WriteString(" • ")
+			b.WriteString(shortSHA(item.sha))
+		}
 		b.WriteString(" • ")
 		b.WriteString(subtleStyle.Render(item.date))
 	} else if item.status != "" {
@@ -74,4 +80,11 @@ func renderDeploymentItem(item deploymentItem, verbose bool) string {
 	}
 
 	return b.String()
+}
+
+func shortSHA(sha string) string {
+	if len(sha) <= 7 {
+		return sha
+	}
+	return sha[:7]
 }
