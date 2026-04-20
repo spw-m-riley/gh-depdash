@@ -71,8 +71,9 @@ func Run(args []string, stdout, stderr io.Writer) error {
 		return writeActionableError(stderr, classifyBuildError(owner, repo, err))
 	}
 
-	// Explicit repo targets default to JSON. --verbose switches to table.
-	// --json always wins: --json --verbose still emits JSON.
+	// Explicit repo targets default to JSON. --verbose switches to the table format.
+	// --json always wins over --verbose: --json --verbose still emits JSON.
+	// --plans only affects environment filtering, not output format.
 	asJSON := opts.JSON || !opts.Verbose
 	rendered, err := renderRows(rows, asJSON, opts.Verbose)
 	if err != nil {

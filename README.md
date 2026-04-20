@@ -8,8 +8,8 @@ By default it reports the stable environments only. `/Plan` environments are hid
 
 `--verbose` and `--json` are operator-facing inspection modes:
 
-- `--verbose` adds latest-attempt status and log URL context to the table output.
-- `--json` emits stable JSON field names for downstream inspection or scripting.
+- `--verbose` switches explicit repo output from the default JSON to the verbose table format, adding latest-attempt status and log URL context.
+- `--json` emits stable JSON field names for downstream inspection or scripting. Combining `--json --verbose` still emits JSON — `--json` always wins.
 
 
 ## Releases
@@ -37,6 +37,6 @@ gh depdash --repo example-owner/example-repo --plans
 | --- | --- |
 | `gh depdash` | Interactive repo picker + deployment browser on a TTY; actionable missing-repo error otherwise |
 | `gh depdash owner/repo` | JSON output for that repo (explicit repo targets default to JSON) |
-| `gh depdash --repo owner/repo --verbose` | Plain table output for that repo |
-| `gh depdash --repo owner/repo --json` | JSON output for that repo |
-| `gh depdash --repo owner/repo --plans` | Includes `/Plan` environments in the JSON output |
+| `gh depdash --repo owner/repo --verbose` | Switches from default JSON to verbose table output (adds status and log URL context) |
+| `gh depdash --repo owner/repo --json` | JSON output for that repo (redundant with default, explicit for scripting) |
+| `gh depdash --repo owner/repo --plans` | Includes `/Plan` environments; output remains JSON unless `--verbose` is also passed |
