@@ -15,7 +15,7 @@ type ViewRow struct {
 }
 
 func RenderTable(rows []deployments.Row, verbose bool) string {
-	viewRows := toViewRows(rows)
+	viewRows := ToViewRows(rows)
 
 	headers := []string{"Env", "Branch", "Date"}
 	if verbose {
@@ -39,7 +39,7 @@ func RenderTable(rows []deployments.Row, verbose bool) string {
 	return renderRows(records)
 }
 
-func toViewRows(rows []deployments.Row) []ViewRow {
+func ToViewRows(rows []deployments.Row) []ViewRow {
 	viewRows := make([]ViewRow, 0, len(rows))
 	for _, row := range rows {
 		viewRow := ViewRow{

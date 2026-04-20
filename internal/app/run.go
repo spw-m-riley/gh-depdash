@@ -5,14 +5,17 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/cli/go-gh/v2/pkg/api"
+	"golang.org/x/term"
 
 	"gh-depdash/internal/cli"
 	"gh-depdash/internal/deployments"
 	"gh-depdash/internal/githubapi"
 	"gh-depdash/internal/output"
+	"gh-depdash/internal/tui"
 )
 
 var (
@@ -20,12 +23,37 @@ var (
 	newGitHubClient = func() (githubapi.Client, error) {
 		return githubapi.NewRESTClient()
 	}
+	isInteractiveTTY = func(stdin, stdout *os.File) bool {
+		return term.IsTerminal(int(stdin.Fd())) && term.IsTerminal(int(stdout.Fd()))
+	}
+	runInteractive = func(includePlans, verbose bool, stdout, stderr io.Writer) error {
+		ctx := context.Background()
+		client, err := newGitHubClient()
+		if err != nil {
+			return writeActionableError(stderr, authUnavailableMessage(err))
+		}
+		tui.SetDeploymentLoader(LoadDeploymentsForRepo)
+		return tui.Run(ctx, client, includePlans, verbose, stdout, stderr)
+	}
 )
 
 func Run(args []string, stdout, stderr io.Writer) error {
 	opts, err := parseOptions(args)
 	if err != nil {
 		return err
+	}
+
+	if opts.Repo == "" {
+		if opts.JSON {
+			return writeActionableError(stderr, "missing repo target: pass <owner/repo> or use --repo <owner/repo>")
+		}
+		if isInteractiveTTY(os.Stdin, os.Stdout) {
+			if err := runInteractive(opts.IncludePlans, opts.Verbose, stdout, stderr); err != nil {
+				return err
+			}
+			return nil
+		}
+		return writeActionableError(stderr, "missing repo target: pass <owner/repo> or use --repo <owner/repo>")
 	}
 
 	owner, repo, err := resolveRepoTarget(opts.Repo)
@@ -62,10 +90,6 @@ func Run(args []string, stdout, stderr io.Writer) error {
 }
 
 func resolveRepoTarget(target string) (string, string, error) {
-	if target == "" {
-		return "", "", errors.New("missing repo target: pass <owner/repo> or use --repo <owner/repo>")
-	}
-
 	owner, repo, ok := strings.Cut(target, "/")
 	if !ok || owner == "" || repo == "" || strings.Contains(repo, "/") {
 		return "", "", fmt.Errorf("invalid repo target %q: expected <owner/repo>", target)
@@ -192,6 +216,10 @@ func (orderingClient) ListDeploymentStatuses(owner, repo string, deploymentID in
 	return nil, nil
 }
 
+func (c orderingClient) ListRepositories(page, perPage int) (githubapi.RepositoryPage, error) {
+	return c.base.ListRepositories(page, perPage)
+}
+
 type singleEnvironmentClient struct {
 	base        githubapi.Client
 	environment string
@@ -207,6 +235,10 @@ func (c singleEnvironmentClient) ListDeployments(owner, repo, environment string
 
 func (c singleEnvironmentClient) ListDeploymentStatuses(owner, repo string, deploymentID int64) ([]githubapi.DeploymentStatus, error) {
 	return c.base.ListDeploymentStatuses(owner, repo, deploymentID)
+}
+
+func (c singleEnvironmentClient) ListRepositories(page, perPage int) (githubapi.RepositoryPage, error) {
+	return c.base.ListRepositories(page, perPage)
 }
 
 var errNoEnvironments = errors.New("no environments found")

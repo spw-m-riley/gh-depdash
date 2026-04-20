@@ -2,6 +2,8 @@
 
 `gh-depdash` shows the latest successful deployment per stable environment for a target repository.
 
+In an interactive terminal, running `gh depdash` with no repo target opens a searchable repository picker and then a deployment browser. Explicit repo targets keep the existing plain-table and JSON flows for scripting.
+
 By default it reports the stable environments only. `/Plan` environments are hidden unless `--plans` is passed.
 
 `--verbose` and `--json` are operator-facing inspection modes:
@@ -22,8 +24,18 @@ Releases are automated with shared workflows from `matt-riley/matt-riley-ci`.
 ## Examples
 
 ```bash
+gh depdash
 gh depdash example-owner/example-repo
 gh depdash --repo example-owner/example-repo --verbose
 gh depdash --repo example-owner/example-repo --json
 gh depdash --repo example-owner/example-repo --plans
 ```
+
+## Behavior matrix
+
+| Command | Behavior |
+| --- | --- |
+| `gh depdash` | Interactive repo picker + deployment browser on a TTY; actionable missing-repo error otherwise |
+| `gh depdash owner/repo` | Existing plain table output for that repo |
+| `gh depdash --repo owner/repo --json` | Existing JSON output for that repo |
+| `gh depdash --repo owner/repo --plans` | Includes `/Plan` environments in the existing plain output |

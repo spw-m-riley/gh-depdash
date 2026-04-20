@@ -2,9 +2,12 @@ package app
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/url"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -203,6 +206,9 @@ func TestRunJSON(t *testing.T) {
 }
 
 func TestRunMissingRepoError(t *testing.T) {
+	restoreTTY := stubIsInteractiveTTY(t, false)
+	defer restoreTTY()
+
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
@@ -215,6 +221,193 @@ func TestRunMissingRepoError(t *testing.T) {
 	}
 	if stdout.Len() != 0 {
 		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+}
+
+func TestRunMissingRepoWithJSONError(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := Run([]string{"--json"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("Run() error = nil, want non-nil")
+	}
+	if !strings.Contains(stderr.String(), "missing repo target") {
+		t.Fatalf("stderr = %q, want missing repo target guidance", stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+}
+
+func TestRunInteractiveLaunch(t *testing.T) {
+	restoreTTY := stubIsInteractiveTTY(t, true)
+	defer restoreTTY()
+
+	interactiveCalled := false
+	restoreInteractive := stubRunInteractive(t, func(includePlans, verbose bool, stdout, stderr io.Writer) error {
+		interactiveCalled = true
+		if includePlans {
+			t.Fatal("includePlans = true, want false")
+		}
+		if verbose {
+			t.Fatal("verbose = true, want false")
+		}
+		_, _ = io.WriteString(stdout, "interactive mode\n")
+		return nil
+	})
+	defer restoreInteractive()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := Run(nil, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("Run() error = %v, want nil", err)
+	}
+	if !interactiveCalled {
+		t.Fatal("runInteractive was not called")
+	}
+	if !strings.Contains(stdout.String(), "interactive mode") {
+		t.Fatalf("stdout = %q, want interactive mode output", stdout.String())
+	}
+}
+
+func TestRunMissingRepoWhenTTYCheckFails(t *testing.T) {
+	restoreTTY := stubIsInteractiveTTYFn(t, func(stdin, stdout *os.File) bool {
+		if stdin != os.Stdin {
+			t.Fatalf("stdin = %v, want os.Stdin", stdin)
+		}
+		if stdout != os.Stdout {
+			t.Fatalf("stdout = %v, want os.Stdout", stdout)
+		}
+		return false
+	})
+	defer restoreTTY()
+
+	restoreInteractive := stubRunInteractive(t, func(includePlans, verbose bool, stdout, stderr io.Writer) error {
+		t.Fatal("runInteractive should not be called when the session is not fully interactive")
+		return nil
+	})
+	defer restoreInteractive()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := Run(nil, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("Run() error = nil, want non-nil")
+	}
+	if !strings.Contains(stderr.String(), "missing repo target") {
+		t.Fatalf("stderr = %q, want missing repo target guidance", stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+}
+
+func TestRunInteractiveError(t *testing.T) {
+	restoreTTY := stubIsInteractiveTTY(t, true)
+	defer restoreTTY()
+
+	restore := stubNewGitHubClient(t, func() (githubapi.Client, error) {
+		return fixtureClient{
+			repositoriesErr: errors.New("repo list failed"),
+		}, nil
+	})
+	defer restore()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := Run(nil, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("Run() error = nil, want non-nil")
+	}
+	want := "failed to list repositories: repo list failed"
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("error = %v, want %q", err, want)
+	}
+	if got := strings.Count(stderr.String(), want); got != 1 {
+		t.Fatalf("stderr = %q, want exactly one %q occurrence, got %d", stderr.String(), want, got)
+	}
+}
+
+func TestRunInteractiveLaunchForwardsFlags(t *testing.T) {
+	restoreTTY := stubIsInteractiveTTY(t, true)
+	defer restoreTTY()
+
+	restoreInteractive := stubRunInteractive(t, func(includePlans, verbose bool, stdout, stderr io.Writer) error {
+		if !includePlans {
+			t.Fatal("includePlans = false, want true")
+		}
+		if !verbose {
+			t.Fatal("verbose = false, want true")
+		}
+		return nil
+	})
+	defer restoreInteractive()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := Run([]string{"--plans", "--verbose"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("Run() error = %v, want nil", err)
+	}
+}
+
+func TestRunExplicitRepoBypassesInteractiveOnTTY(t *testing.T) {
+	restoreTTY := stubIsInteractiveTTY(t, true)
+	defer restoreTTY()
+
+	restore := stubNewGitHubClient(t, func() (githubapi.Client, error) {
+		return fixtureClient{
+			environments: []githubapi.Environment{
+				{Name: "Production"},
+			},
+			deployments: map[string][]githubapi.Deployment{
+				"Production": {
+					{
+						ID:        301,
+						Ref:       "main",
+						CreatedAt: "2024-03-14T09:26:00Z",
+					},
+				},
+			},
+			statuses: map[int64][]githubapi.DeploymentStatus{
+				301: {
+					{
+						State:     "success",
+						CreatedAt: "2024-03-14T09:30:00Z",
+						LogURL:    "https://example.com/prod",
+					},
+				},
+			},
+		}, nil
+	})
+	defer restore()
+
+	restoreInteractive := stubRunInteractive(t, func(includePlans, verbose bool, stdout, stderr io.Writer) error {
+		t.Fatal("runInteractive should not be called for explicit repo targets")
+		return nil
+	})
+	defer restoreInteractive()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := Run([]string{"octo/example"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("Run() error = %v, want nil", err)
+	}
+
+	want := "Env | Branch | Date\nProduction | main | 2024-03-14\n"
+	if stdout.String() != want {
+		t.Fatalf("stdout = %q, want %q", stdout.String(), want)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
 }
 
@@ -376,6 +569,36 @@ func stubNewGitHubClient(t *testing.T, fn func() (githubapi.Client, error)) func
 	}
 }
 
+func stubIsInteractiveTTY(t *testing.T, interactive bool) func() {
+	t.Helper()
+
+	return stubIsInteractiveTTYFn(t, func(stdin, stdout *os.File) bool {
+		return interactive
+	})
+}
+
+func stubIsInteractiveTTYFn(t *testing.T, fn func(stdin, stdout *os.File) bool) func() {
+	t.Helper()
+
+	previous := isInteractiveTTY
+	isInteractiveTTY = fn
+
+	return func() {
+		isInteractiveTTY = previous
+	}
+}
+
+func stubRunInteractive(t *testing.T, fn func(includePlans, verbose bool, stdout, stderr io.Writer) error) func() {
+	t.Helper()
+
+	previous := runInteractive
+	runInteractive = fn
+
+	return func() {
+		runInteractive = previous
+	}
+}
+
 type fixtureClient struct {
 	environments    []githubapi.Environment
 	environmentsErr error
@@ -383,6 +606,8 @@ type fixtureClient struct {
 	deploymentErrs  map[string]error
 	statuses        map[int64][]githubapi.DeploymentStatus
 	statusErrs      map[int64]error
+	repositories    []githubapi.Repository
+	repositoriesErr error
 }
 
 func (c fixtureClient) ListEnvironments(owner, repo string) ([]githubapi.Environment, error) {
@@ -406,6 +631,16 @@ func (c fixtureClient) ListDeploymentStatuses(owner, repo string, deploymentID i
 	return slices.Clone(c.statuses[deploymentID]), nil
 }
 
+func (c fixtureClient) ListRepositories(page, perPage int) (githubapi.RepositoryPage, error) {
+	if c.repositoriesErr != nil {
+		return githubapi.RepositoryPage{}, c.repositoriesErr
+	}
+	if c.repositories == nil {
+		return githubapi.RepositoryPage{}, nil
+	}
+	return githubapi.RepositoryPage{Repositories: slices.Clone(c.repositories)}, nil
+}
+
 func mustParseURL(t *testing.T, raw string) *url.URL {
 	t.Helper()
 
@@ -414,4 +649,165 @@ func mustParseURL(t *testing.T, raw string) *url.URL {
 		t.Fatalf("url.Parse(%q) error = %v", raw, err)
 	}
 	return parsed
+}
+
+func TestLoadDeploymentsForRepo(t *testing.T) {
+	client := fixtureClient{
+		environments: []githubapi.Environment{
+			{Name: "Production"},
+		},
+		deployments: map[string][]githubapi.Deployment{
+			"Production": {
+				{
+					ID:        201,
+					Ref:       "main",
+					CreatedAt: "2024-03-14T10:00:00Z",
+				},
+			},
+		},
+		statuses: map[int64][]githubapi.DeploymentStatus{
+			201: {
+				{
+					State:     "success",
+					CreatedAt: "2024-03-14T10:05:00Z",
+					LogURL:    "https://example.com/log",
+				},
+			},
+		},
+	}
+
+	items, partialFailures, err := LoadDeploymentsForRepo(context.Background(), client, "octo", "example", false, false)
+	if err != nil {
+		t.Fatalf("LoadDeploymentsForRepo() error = %v", err)
+	}
+
+	if len(partialFailures) != 0 {
+		t.Errorf("LoadDeploymentsForRepo() returned %d partial failures, want 0", len(partialFailures))
+	}
+
+	if len(items) != 1 {
+		t.Fatalf("LoadDeploymentsForRepo() returned %d items, want 1", len(items))
+	}
+
+	want := output.ViewRow{
+		Environment: "Production",
+		Branch:      "main",
+		Date:        "2024-03-14",
+		Status:      "success",
+		LogURL:      "https://example.com/log",
+	}
+
+	if items[0] != want {
+		t.Errorf("items[0] = %+v, want %+v", items[0], want)
+	}
+}
+
+func TestLoadDeploymentsForRepoPreservesPartialFailures(t *testing.T) {
+	client := fixtureClient{
+		environments: []githubapi.Environment{
+			{Name: "Development"},
+			{Name: "UAT"},
+			{Name: "Production"},
+		},
+		deployments: map[string][]githubapi.Deployment{
+			"Development": {
+				{
+					ID:        101,
+					Ref:       "feature/dev",
+					CreatedAt: "2024-03-14T09:00:00Z",
+				},
+			},
+			"Production": {
+				{
+					ID:        301,
+					Ref:       "main",
+					CreatedAt: "2024-03-14T12:00:00Z",
+				},
+			},
+		},
+		deploymentErrs: map[string]error{
+			"UAT": errors.New("environment temporarily unavailable"),
+		},
+		statuses: map[int64][]githubapi.DeploymentStatus{
+			101: {
+				{
+					State:     "success",
+					CreatedAt: "2024-03-14T09:05:00Z",
+					LogURL:    "https://example.com/dev-log",
+				},
+			},
+			301: {
+				{
+					State:     "success",
+					CreatedAt: "2024-03-14T12:05:00Z",
+					LogURL:    "https://example.com/prod-log",
+				},
+			},
+		},
+	}
+
+	items, partialFailures, err := LoadDeploymentsForRepo(context.Background(), client, "octo", "example", false, true)
+	if err != nil {
+		t.Fatalf("LoadDeploymentsForRepo() error = %v, want nil", err)
+	}
+
+	if len(partialFailures) != 1 {
+		t.Fatalf("LoadDeploymentsForRepo() returned %d partial failures, want 1", len(partialFailures))
+	}
+
+	if !strings.Contains(partialFailures[0], "UAT") {
+		t.Errorf("partial failure %q does not mention UAT", partialFailures[0])
+	}
+	if !strings.Contains(partialFailures[0], "temporarily unavailable") {
+		t.Errorf("partial failure %q does not contain error message", partialFailures[0])
+	}
+
+	if len(items) != 3 {
+		t.Fatalf("LoadDeploymentsForRepo() returned %d items, want 3", len(items))
+	}
+
+	wantDev := output.ViewRow{
+		Environment: "Development",
+		Branch:      "feature/dev",
+		Date:        "2024-03-14",
+		Status:      "success",
+		LogURL:      "https://example.com/dev-log",
+	}
+	if items[0] != wantDev {
+		t.Errorf("items[0] = %+v, want %+v", items[0], wantDev)
+	}
+
+	wantUAT := output.ViewRow{
+		Environment: "UAT",
+	}
+	if items[1] != wantUAT {
+		t.Errorf("items[1] = %+v, want blank UAT row %+v", items[1], wantUAT)
+	}
+
+	wantProd := output.ViewRow{
+		Environment: "Production",
+		Branch:      "main",
+		Date:        "2024-03-14",
+		Status:      "success",
+		LogURL:      "https://example.com/prod-log",
+	}
+	if items[2] != wantProd {
+		t.Errorf("items[2] = %+v, want %+v", items[2], wantProd)
+	}
+}
+
+func TestLoadDeploymentsForRepoClassifiesFatalErrors(t *testing.T) {
+	client := fixtureClient{
+		environmentsErr: &api.HTTPError{
+			StatusCode: 403,
+		},
+	}
+
+	_, _, err := LoadDeploymentsForRepo(context.Background(), client, "octo", "example", false, false)
+	if err == nil {
+		t.Fatal("LoadDeploymentsForRepo() error = nil, want non-nil")
+	}
+	if !strings.Contains(err.Error(), "repository access denied for octo/example") {
+		t.Fatalf("error = %v, want repository access denied guidance", err)
+	}
 }

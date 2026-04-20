@@ -164,3 +164,35 @@ func TestRenderJSONPreservesLatestAttemptContextWithoutSuccess(t *testing.T) {
 		t.Fatalf("unexpected decoded json for no-success row\nwant: %#v\ngot: %#v", want, decoded)
 	}
 }
+
+func TestToViewRowsIsExported(t *testing.T) {
+	rows := []deployments.Row{
+		{
+			Environment: "Staging",
+			Branch:      "feature/test",
+			Date:        time.Date(2024, time.April, 1, 12, 0, 0, 0, time.UTC),
+			Status:      "success",
+			LogURL:      "https://example.com/staging-log",
+			HasSuccess:  true,
+		},
+	}
+
+	viewRows := ToViewRows(rows)
+
+	if len(viewRows) != 1 {
+		t.Fatalf("ToViewRows returned %d rows, want 1", len(viewRows))
+	}
+
+	want := ViewRow{
+		Environment: "Staging",
+		Branch:      "feature/test",
+		Date:        "2024-04-01",
+		Status:      "success",
+		LogURL:      "https://example.com/staging-log",
+	}
+
+	if viewRows[0] != want {
+		t.Fatalf("ToViewRows returned unexpected row\nwant: %#v\ngot: %#v", want, viewRows[0])
+	}
+}
+

@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -18,8 +19,8 @@ import (
 func TestListEnvironments(t *testing.T) {
 	client := newFixtureClient(t, fixtureResponse{
 		path:       "repos/octo/example/environments",
-		statusCode:  http.StatusOK,
-		body:        loadTestdata(t, "environments.json"),
+		statusCode: http.StatusOK,
+		body:       loadTestdata(t, "environments.json"),
 	})
 
 	got, err := client.ListEnvironments("octo", "example")
@@ -35,10 +36,10 @@ func TestListEnvironments(t *testing.T) {
 
 func TestListDeploymentsByEnvironment(t *testing.T) {
 	tests := []struct {
-		name       string
+		name        string
 		environment string
-		fixture    string
-		want       []Deployment
+		fixture     string
+		want        []Deployment
 	}{
 		{
 			name:        "development",
@@ -61,10 +62,10 @@ func TestListDeploymentsByEnvironment(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client := newFixtureClient(t, fixtureResponse{
-				path:        "repos/octo/example/deployments",
-				query:       url.Values{"environment": {tt.environment}, "per_page": {"10"}},
-				statusCode:  http.StatusOK,
-				body:        loadTestdata(t, tt.fixture),
+				path:       "repos/octo/example/deployments",
+				query:      url.Values{"environment": {tt.environment}, "per_page": {"10"}},
+				statusCode: http.StatusOK,
+				body:       loadTestdata(t, tt.fixture),
 			})
 
 			got, err := client.ListDeployments("octo", "example", tt.environment)
@@ -129,7 +130,7 @@ func TestClientPropagatesHTTPErrors(t *testing.T) {
 	client := newFixtureClient(t, fixtureResponse{
 		path:       "repos/octo/example/deployments/4361927516/statuses",
 		query:      url.Values{"per_page": {"10"}},
-		statusCode:  http.StatusInternalServerError,
+		statusCode: http.StatusInternalServerError,
 		body:       loadTestdata(t, "statuses-uat-error.json"),
 	})
 
@@ -142,9 +143,80 @@ func TestClientPropagatesHTTPErrors(t *testing.T) {
 	}
 }
 
+func TestListRepositories(t *testing.T) {
+	client := newFixtureClient(t, fixtureResponse{
+		path:       "user/repos",
+		query:      url.Values{"sort": {"updated"}, "direction": {"desc"}, "page": {"3"}, "per_page": {"17"}},
+		statusCode: http.StatusOK,
+		headers: http.Header{
+			"Link": {`<https://api.github.com/user/repos?direction=desc&page=4&per_page=17&sort=updated>; rel="next", <https://api.github.com/user/repos?direction=desc&page=5&per_page=17&sort=updated>; rel="last"`},
+		},
+		body: loadTestdata(t, "repositories.json"),
+	})
+
+	got, err := client.ListRepositories(3, 17)
+	if err != nil {
+		t.Fatalf("ListRepositories() error = %v, want nil", err)
+	}
+
+	want := RepositoryPage{
+		Repositories: []Repository{
+			{
+				Name:        "example",
+				FullName:    "octo/example",
+				Description: stringPtr("Primary deployment target"),
+				Private:     true,
+				Visibility:  "private",
+				Permissions: RepositoryPermissions{Push: true},
+				UpdatedAt:   "2026-04-14T10:30:00Z",
+			},
+			{
+				Name:        "demo",
+				FullName:    "octo/demo",
+				Description: stringPtr("Shared sandbox"),
+				Private:     false,
+				Visibility:  "public",
+				Permissions: RepositoryPermissions{Push: true},
+				UpdatedAt:   "2026-04-13T15:20:00Z",
+			},
+			{
+				Name:        "readonly",
+				FullName:    "octo/readonly",
+				Description: nil,
+				Private:     true,
+				Visibility:  "private",
+				Permissions: RepositoryPermissions{Push: false},
+				UpdatedAt:   "2026-04-12T08:00:00Z",
+			},
+		},
+		HasMore: true,
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ListRepositories() = %#v, want %#v", got, want)
+	}
+}
+
+func TestListRepositoriesWithoutNextPage(t *testing.T) {
+	client := newFixtureClient(t, fixtureResponse{
+		path:       "user/repos",
+		query:      url.Values{"sort": {"updated"}, "direction": {"desc"}, "page": {"1"}, "per_page": {"30"}},
+		statusCode: http.StatusOK,
+		body:       loadTestdata(t, "repositories.json"),
+	})
+
+	got, err := client.ListRepositories(1, 30)
+	if err != nil {
+		t.Fatalf("ListRepositories() error = %v, want nil", err)
+	}
+	if got.HasMore {
+		t.Fatalf("ListRepositories().HasMore = true, want false without rel=next link")
+	}
+}
+
 type fixtureResponse struct {
 	path       string
 	query      url.Values
+	headers    http.Header
 	statusCode int
 	body       []byte
 }
@@ -164,14 +236,23 @@ func (rt fixtureRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 		rt.t.Fatalf("unexpected path %q, want %q", got, "/"+rt.response.path)
 	}
 	gotQuery := req.URL.Query()
-	if !slices.Equal(gotQuery["per_page"], rt.response.query["per_page"]) || gotQuery.Get("environment") != rt.response.query.Get("environment") {
-		rt.t.Fatalf("unexpected query %q, want %q", gotQuery.Encode(), rt.response.query.Encode())
+	wantQuery := rt.response.query
+	if wantQuery == nil {
+		wantQuery = url.Values{}
+	}
+	if !reflect.DeepEqual(gotQuery, wantQuery) {
+		rt.t.Fatalf("unexpected query %q, want %q", gotQuery.Encode(), wantQuery.Encode())
+	}
+
+	headers := http.Header{"Content-Type": {"application/json"}}
+	for key, values := range rt.response.headers {
+		headers[key] = append([]string(nil), values...)
 	}
 
 	return &http.Response{
 		StatusCode: rt.response.statusCode,
 		Status:     http.StatusText(rt.response.statusCode),
-		Header:     http.Header{"Content-Type": {"application/json"}},
+		Header:     headers,
 		Body:       io.NopCloser(bytes.NewReader(rt.response.body)),
 		Request:    req,
 	}, nil
@@ -181,9 +262,9 @@ func newFixtureClient(t *testing.T, response fixtureResponse) Client {
 	t.Helper()
 
 	rest, err := api.NewRESTClient(api.ClientOptions{
-		Host:        "github.com",
-		AuthToken:   "test-token",
-		Transport:   fixtureRoundTripper{t: t, response: response},
+		Host:               "github.com",
+		AuthToken:          "test-token",
+		Transport:          fixtureRoundTripper{t: t, response: response},
 		SkipDefaultHeaders: true,
 	})
 	if err != nil {
@@ -202,4 +283,8 @@ func loadTestdata(t *testing.T, name string) []byte {
 		t.Fatalf("ReadFile(%q) error = %v", path, err)
 	}
 	return data
+}
+
+func stringPtr(value string) *string {
+	return &value
 }

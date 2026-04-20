@@ -1,0 +1,36 @@
+package tui
+
+import (
+	"gh-depdash/internal/githubapi"
+	"gh-depdash/internal/output"
+)
+
+type repoPageLoadedMsg struct {
+	repos   []githubapi.Repository
+	hasMore bool
+}
+
+type repoPageFailedMsg struct {
+	err string
+}
+
+type moreReposLoadedMsg struct {
+	sessionID int
+	repos     []githubapi.Repository
+	hasMore   bool
+}
+
+type moreReposFailedMsg struct {
+	sessionID int
+	err       string
+}
+
+type deploymentsLoadedMsg struct {
+	rows            []output.ViewRow
+	partialFailures []string
+}
+
+type deploymentsFatalErrorMsg struct {
+	err string
+}
+type backToRepoPickerMsg struct{}
