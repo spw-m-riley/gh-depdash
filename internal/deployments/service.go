@@ -101,6 +101,7 @@ func (s Service) buildRow(owner, repo, environment string) (Row, error) {
 		}
 
 		row.Branch = deployment.Ref
+		row.SHA = deployment.SHA
 		row.Date = parseTime(deployment.CreatedAt)
 		row.Status = current.State
 		row.LogURL = current.LogURL

@@ -9,6 +9,7 @@ import (
 type ViewRow struct {
 	Environment string `json:"environment"`
 	Branch      string `json:"branch"`
+	SHA         string `json:"sha,omitempty"`
 	Date        string `json:"date"`
 	Status      string `json:"status,omitempty"`
 	LogURL      string `json:"logUrl,omitempty"`
@@ -49,6 +50,7 @@ func ToViewRows(rows []deployments.Row) []ViewRow {
 		}
 		if row.HasSuccess {
 			viewRow.Branch = row.Branch
+			viewRow.SHA = row.SHA
 			viewRow.Date = row.Date.Format(dateLayout)
 		}
 		viewRows = append(viewRows, viewRow)

@@ -2,11 +2,13 @@
   {
     "id": 4361927516,
     "ref": "release-2.2.0",
+    "sha": "sha-uat-loser",
     "created_at": "2026-04-14T08:46:52Z"
   },
   {
     "id": 4361877783,
     "ref": "release-3.1.0",
+    "sha": "sha-uat-winner",
     "created_at": "2026-04-14T08:41:51Z"
   }
 ]
