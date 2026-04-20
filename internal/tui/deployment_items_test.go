@@ -37,6 +37,13 @@ func TestRenderDeploymentItemShortSHAFallsBackToFullValue(t *testing.T) {
 	}
 }
 
+func TestShortSHAExactSevenCharBoundary(t *testing.T) {
+	got := shortSHA("1234567")
+	if got != "1234567" {
+		t.Fatalf("shortSHA(exactly 7 chars) = %q, want %q", got, "1234567")
+	}
+}
+
 func TestRenderDeploymentItemNonSuccessRowDoesNotRenderSHA(t *testing.T) {
 	item := newDeploymentItem(output.ViewRow{
 		Environment: "Test",

@@ -18,7 +18,7 @@ import (
 	"gh-depdash/internal/output"
 )
 
-func TestRunDefaultTable(t *testing.T) {
+func TestRunVerboseExplicitRepo(t *testing.T) {
 	restore := stubNewGitHubClient(t, func() (githubapi.Client, error) {
 		return fixtureClient{
 			environments: []githubapi.Environment{
